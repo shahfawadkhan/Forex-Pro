@@ -1,13 +1,17 @@
 const mongoose = require('mongoose');
 
 const personSchema = new mongoose.Schema({
-  name: { type: String, required: true, trim: true },
-  phone: { type: String, trim: true },
+  name:    { type: String, required: true, trim: true },
+  phone:   { type: String, trim: true },
   address: { type: String, trim: true },
-  type: { type: String, enum: ['Buyer', 'Seller', 'Both'], default: 'Both' },
-  balance: { type: Number, default: 0 }, // positive = they owe us, negative = we owe them
-  notes: { type: String },
+  notes:   { type: String },
   isActive: { type: Boolean, default: true },
+
+  // Main PKR balance: positive = they owe us, negative = we owe them
+  balance: { type: Number, default: 0 },
+
+  // Advance balance (pending advance deals not yet settled)
+  advanceBalance: { type: Number, default: 0 },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Person', personSchema);

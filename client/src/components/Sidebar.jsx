@@ -1,17 +1,20 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { 
-  MdDashboard, MdPeople, MdSwapHoriz, MdAccountBalance, 
-  MdPayment, MdBarChart, MdSettings, MdLogout, MdMenu, MdClose
+import {
+  MdDashboard, MdSwapHoriz, MdPeople, MdAccountBalance,
+  MdPayment, MdBarChart, MdLogout, MdMenu, MdClose,
+  MdVilla, MdHandshake,
 } from 'react-icons/md';
 import { useState } from 'react';
 
 const links = [
-  { to: '/', icon: MdDashboard, label: 'Dashboard' },
-  { to: '/transactions', icon: MdSwapHoriz, label: 'Transactions' },
-  { to: '/persons', icon: MdPeople, label: 'Persons' },
-  { to: '/payments', icon: MdPayment, label: 'Payments' },
-  { to: '/accounts', icon: MdAccountBalance, label: 'Accounts' },
-  { to: '/reports', icon: MdBarChart, label: 'Reports' },
+  { to: '/',            icon: MdDashboard,    label: 'Dashboard'    },
+  { to: '/transactions', icon: MdSwapHoriz,  label: 'Transactions' },
+  { to: '/persons',     icon: MdPeople,       label: 'Lists'        },
+  { to: '/payments',    icon: MdPayment,      label: 'Payments'     },
+  { to: '/accounts',    icon: MdAccountBalance, label: 'Accounts'   },
+  { to: '/loans',       icon: MdHandshake,    label: 'Loans'        },
+  { to: '/village',     icon: MdVilla,        label: 'Village'      },
+  { to: '/reports',     icon: MdBarChart,     label: 'Reports'      },
 ];
 
 export default function Sidebar() {
@@ -25,26 +28,22 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Mobile toggle */}
-      <button 
+      <button
         onClick={() => setOpen(!open)}
         className="lg:hidden fixed top-4 left-4 z-50 bg-surface-100 p-2 rounded-xl border border-surface-200"
       >
         {open ? <MdClose size={20} /> : <MdMenu size={20} />}
       </button>
 
-      {/* Overlay */}
       {open && (
         <div className="lg:hidden fixed inset-0 bg-black/50 z-30" onClick={() => setOpen(false)} />
       )}
 
-      {/* Sidebar */}
       <aside className={`
         fixed lg:static inset-y-0 left-0 z-40 w-64 bg-surface-50 border-r border-surface-200
         flex flex-col transition-transform duration-300
         ${open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
-        {/* Logo */}
         <div className="p-6 border-b border-surface-200">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-accent-gold rounded-xl flex items-center justify-center">
@@ -57,7 +56,6 @@ export default function Sidebar() {
           </div>
         </div>
 
-        {/* Nav */}
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {links.map(({ to, icon: Icon, label }) => (
             <NavLink
@@ -73,7 +71,6 @@ export default function Sidebar() {
           ))}
         </nav>
 
-        {/* Currencies indicator */}
         <div className="p-4 border-t border-surface-200">
           <div className="flex gap-2 mb-4">
             <span className="badge-aed">AED</span>

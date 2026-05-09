@@ -9,6 +9,8 @@ import PersonLedger from './pages/PersonLedger';
 import Payments from './pages/Payments';
 import Accounts from './pages/Accounts';
 import Reports from './pages/Reports';
+import Loans from './pages/Loans';
+import Village from './pages/Village';
 import Login from './pages/Login';
 
 const isAuthenticated = () => !!localStorage.getItem('token');
@@ -32,7 +34,7 @@ function ProtectedRoute() {
 export default function App() {
   return (
     <BrowserRouter>
-      <Toaster 
+      <Toaster
         position="top-right"
         toastOptions={{
           style: { background: '#1a1d27', color: '#fff', border: '1px solid #2a2e42', fontSize: '13px' },
@@ -42,13 +44,15 @@ export default function App() {
       <Routes>
         <Route path="/login" element={isAuthenticated() ? <Navigate to="/" /> : <Login />} />
         <Route element={<ProtectedRoute />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/transactions" element={<Transactions />} />
-          <Route path="/persons" element={<Persons />} />
-          <Route path="/persons/:id/ledger" element={<PersonLedger />} />
-          <Route path="/payments" element={<Payments />} />
-          <Route path="/accounts" element={<Accounts />} />
-          <Route path="/reports" element={<Reports />} />
+          <Route path="/"                        element={<Dashboard />} />
+          <Route path="/transactions"            element={<Transactions />} />
+          <Route path="/persons"                 element={<Persons />} />
+          <Route path="/persons/:id/ledger"      element={<PersonLedger />} />
+          <Route path="/payments"                element={<Payments />} />
+          <Route path="/accounts"                element={<Accounts />} />
+          <Route path="/loans"                   element={<Loans />} />
+          <Route path="/village"                 element={<Village />} />
+          <Route path="/reports"                 element={<Reports />} />
         </Route>
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

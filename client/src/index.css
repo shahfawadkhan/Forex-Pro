@@ -116,3 +116,13 @@
   backdrop-filter: blur(8px);
   background: rgba(0,0,0,0.7);
 }
+
+/* ── Print styles ─────────────────────────────────────────── */
+@media print {
+  body { background: white !important; color: black !important; }
+  aside, .print\:hidden { display: none !important; }
+  main { padding: 0 !important; }
+  .card { border: 1px solid #ccc !important; background: white !important; color: black !important; }
+  .table-head, .table-cell { color: black !important; }
+  .font-mono-num { color: black !important; }
+}

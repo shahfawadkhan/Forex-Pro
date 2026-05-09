@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MdAdd, MdEdit, MdDelete, MdPerson, MdPhone, MdArrowForward } from 'react-icons/md';
+import { MdAdd, MdEdit, MdDelete, MdArrowForward, MdSearch } from 'react-icons/md';
 import toast from 'react-hot-toast';
 import api from '../utils/api';
 import { formatPKR } from '../utils/formatters';
 import { useApp } from '../context/AppContext';
 import Modal from '../components/Modal';
 
-const emptyForm = { name: '', phone: '', address: '', type: 'Both', notes: '' };
+const emptyForm = { name: '', phone: '', address: '', notes: '' };
 
 export default function Persons() {
   const { persons, fetchPersons } = useApp();
@@ -16,7 +16,7 @@ export default function Persons() {
   const [form, setForm] = useState(emptyForm);
   const [search, setSearch] = useState('');
 
-  const filtered = persons.filter(p => 
+  const filtered = persons.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
     p.phone?.includes(search)
   );
@@ -27,10 +27,10 @@ export default function Persons() {
     try {
       if (editItem) {
         await api.put(`/persons/${editItem._id}`, form);
-        toast.success('Person updated');
+        toast.success('Updated');
       } else {
         await api.post('/persons', form);
-        toast.success('Person added');
+        toast.success('Added to Lists');
       }
       setShowModal(false); setEditItem(null); setForm(emptyForm);
       fetchPersons();
@@ -38,109 +38,128 @@ export default function Persons() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this person?')) return;
+    if (!confirm('Remove from Lists?')) return;
     await api.delete(`/persons/${id}`);
-    toast.success('Deleted');
+    toast.success('Removed');
     fetchPersons();
   };
 
   const openEdit = (p) => {
     setEditItem(p);
-    setForm({ name: p.name, phone: p.phone || '', address: p.address || '', type: p.type, notes: p.notes || '' });
+    setForm({ name: p.name, phone: p.phone || '', address: p.address || '', notes: p.notes || '' });
     setShowModal(true);
   };
 
   const totalReceivable = filtered.reduce((s, p) => p.balance > 0 ? s + p.balance : s, 0);
-  const totalPayable = filtered.reduce((s, p) => p.balance < 0 ? s + Math.abs(p.balance) : s, 0);
+  const totalPayable    = filtered.reduce((s, p) => p.balance < 0 ? s + Math.abs(p.balance) : s, 0);
+  const totalAdvance    = filtered.reduce((s, p) => s + (p.advanceBalance || 0), 0);
 
   return (
     <div className="space-y-6 animate-fadeInUp">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-display font-bold text-2xl text-gradient-gold">Persons</h1>
+          <h1 className="font-display font-bold text-2xl text-gradient-gold">Lists</h1>
           <p className="text-white/40 text-sm">{persons.length} registered</p>
         </div>
         <button onClick={() => { setEditItem(null); setForm(emptyForm); setShowModal(true); }} className="btn-primary flex items-center gap-2">
-          <MdAdd size={18} /> Add Person
+          <MdAdd size={18} /> Add to List
         </button>
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <div className="stat-card">
-          <div className="text-xs text-white/40 uppercase tracking-wider">Total Receivable</div>
+          <div className="text-xs text-white/40 uppercase tracking-wider">Receivable</div>
           <div className="font-mono-num text-xl font-bold text-accent-green">{formatPKR(totalReceivable)}</div>
+          <div className="text-xs text-white/30">They owe us</div>
         </div>
         <div className="stat-card">
-          <div className="text-xs text-white/40 uppercase tracking-wider">Total Payable</div>
+          <div className="text-xs text-white/40 uppercase tracking-wider">Payable</div>
           <div className="font-mono-num text-xl font-bold text-accent-red">{formatPKR(totalPayable)}</div>
+          <div className="text-xs text-white/30">We owe them</div>
+        </div>
+        <div className="stat-card">
+          <div className="text-xs text-white/40 uppercase tracking-wider">Advance Pending</div>
+          <div className="font-mono-num text-xl font-bold text-accent-purple">{formatPKR(totalAdvance)}</div>
+          <div className="text-xs text-white/30">Unsettled advances</div>
         </div>
       </div>
 
       {/* Search */}
       <div className="relative">
-        <input className="input pl-10" placeholder="Search by name or phone..." value={search} onChange={e => setSearch(e.target.value)} />
-        <MdPerson className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" size={18} />
+        <MdSearch size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+        <input
+          className="input pl-9"
+          placeholder="Search by name or phone..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
       </div>
 
-      {/* Grid */}
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map(p => (
-          <div key={p._id} className="card hover:border-accent-gold/30 transition-all">
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-accent-gold/20 to-accent-gold/5 border border-accent-gold/20 rounded-xl flex items-center justify-center font-display font-bold text-accent-gold">
-                  {p.name.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <p className="font-semibold">{p.name}</p>
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs bg-surface-200 text-white/50 px-1.5 py-0.5 rounded-full">{p.type}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-1">
-                <button onClick={() => openEdit(p)} className="p-1.5 hover:bg-surface-200 rounded-lg transition-colors text-white/40 hover:text-white">
-                  <MdEdit size={14} />
-                </button>
-                <button onClick={() => handleDelete(p._id)} className="p-1.5 hover:bg-accent-red/10 rounded-lg transition-colors text-white/40 hover:text-accent-red">
-                  <MdDelete size={14} />
-                </button>
-              </div>
-            </div>
-
-            {p.phone && (
-              <div className="flex items-center gap-2 text-xs text-white/40 mb-3">
-                <MdPhone size={12} /> {p.phone}
-              </div>
-            )}
-
-            <div className="border-t border-surface-200 pt-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-xs text-white/30 mb-0.5">Balance</div>
-                  <div className={`font-mono-num font-bold text-lg ${p.balance > 0 ? 'text-accent-green' : p.balance < 0 ? 'text-accent-red' : 'text-white/40'}`}>
-                    {formatPKR(Math.abs(p.balance))}
-                  </div>
-                  <div className="text-xs text-white/30">
-                    {p.balance > 0 ? 'owes us' : p.balance < 0 ? 'we owe' : 'settled'}
-                  </div>
-                </div>
-                <Link to={`/persons/${p._id}/ledger`} className="flex items-center gap-1 text-xs text-accent-gold hover:underline">
-                  Ledger <MdArrowForward size={12} />
-                </Link>
-              </div>
-            </div>
-          </div>
-        ))}
-        {filtered.length === 0 && (
-          <div className="col-span-3 text-center py-16 text-white/30">
-            {search ? 'No matches found' : 'No persons yet. Add one!'}
-          </div>
-        )}
+      {/* Table */}
+      <div className="card p-0 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-surface-200">
+                <th className="table-head text-left">Name</th>
+                <th className="table-head text-left">Phone</th>
+                <th className="table-head text-right">Balance</th>
+                <th className="table-head text-right">Advance</th>
+                <th className="table-head text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr><td colSpan={5} className="text-center py-12 text-white/30">No entries found</td></tr>
+              ) : filtered.map(p => (
+                <tr key={p._id} className="table-row">
+                  <td className="table-cell">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-surface-200 rounded-full flex items-center justify-center text-xs font-bold text-white/60 flex-shrink-0">
+                        {p.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-medium">{p.name}</p>
+                        {p.address && <p className="text-xs text-white/30">{p.address}</p>}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="table-cell text-white/60 font-mono-num text-xs">{p.phone || '—'}</td>
+                  <td className="table-cell text-right">
+                    <span className={`font-mono-num font-semibold ${p.balance > 0 ? 'text-accent-green' : p.balance < 0 ? 'text-accent-red' : 'text-white/30'}`}>
+                      {formatPKR(Math.abs(p.balance))}
+                    </span>
+                    <div className="text-xs text-white/30">
+                      {p.balance > 0 ? 'Owes us' : p.balance < 0 ? 'We owe' : 'Settled'}
+                    </div>
+                  </td>
+                  <td className="table-cell text-right">
+                    {(p.advanceBalance || 0) !== 0 ? (
+                      <span className="font-mono-num text-sm text-accent-purple">{formatPKR(Math.abs(p.advanceBalance))}</span>
+                    ) : <span className="text-white/20">—</span>}
+                  </td>
+                  <td className="table-cell text-right">
+                    <div className="flex justify-end gap-1">
+                      <Link to={`/persons/${p._id}/ledger`} className="p-1.5 hover:bg-surface-200 rounded-lg transition-colors text-white/40 hover:text-accent-gold" title="View Ledger">
+                        <MdArrowForward size={14} />
+                      </Link>
+                      <button onClick={() => openEdit(p)} className="p-1.5 hover:bg-surface-200 rounded-lg transition-colors text-white/40 hover:text-white">
+                        <MdEdit size={14} />
+                      </button>
+                      <button onClick={() => handleDelete(p._id)} className="p-1.5 hover:bg-accent-red/10 rounded-lg transition-colors text-white/40 hover:text-accent-red">
+                        <MdDelete size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editItem ? 'Edit Person' : 'Add Person'}>
+      <Modal isOpen={showModal} onClose={() => { setShowModal(false); setEditItem(null); }} title={editItem ? 'Edit Entry' : 'Add to List'}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="label">Name *</label>
@@ -148,18 +167,7 @@ export default function Persons() {
           </div>
           <div>
             <label className="label">Phone</label>
-            <input className="input" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+92 300 0000000" />
-          </div>
-          <div>
-            <label className="label">Type</label>
-            <div className="flex gap-2">
-              {['Buyer', 'Seller', 'Both'].map(t => (
-                <button type="button" key={t} onClick={() => setForm(f => ({ ...f, type: t }))}
-                  className={`flex-1 py-2 rounded-xl text-sm border transition-all ${form.type === t ? 'bg-accent-gold/20 border-accent-gold text-accent-gold' : 'bg-surface-100 border-surface-200 text-white/50'}`}>
-                  {t}
-                </button>
-              ))}
-            </div>
+            <input className="input font-mono-num" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="e.g. 0300-1234567" />
           </div>
           <div>
             <label className="label">Address</label>
@@ -167,10 +175,10 @@ export default function Persons() {
           </div>
           <div>
             <label className="label">Notes</label>
-            <textarea className="input" rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+            <textarea className="input" rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional notes" />
           </div>
           <div className="flex gap-3 pt-2">
-            <button type="submit" className="btn-primary flex-1">{editItem ? 'Update' : 'Add Person'}</button>
+            <button type="submit" className="btn-primary flex-1">{editItem ? 'Update' : 'Add to List'}</button>
             <button type="button" onClick={() => setShowModal(false)} className="btn-secondary">Cancel</button>
           </div>
         </form>

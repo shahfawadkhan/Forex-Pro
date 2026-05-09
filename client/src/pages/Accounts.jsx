@@ -90,6 +90,7 @@ export default function Accounts() {
         </button>
       </div>
 
+      {/* Total */}
       <div className="card border-accent-gold/20 glow-gold">
         <div className="text-sm text-white/40">Total Balance (All Accounts)</div>
         <div className={`font-mono-num text-4xl font-bold mt-2 ${totalBalance >= 0 ? 'text-white' : 'text-accent-red'}`}>
