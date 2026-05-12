@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { FileText, FileSpreadsheet, Printer, Trash2, Plus, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react'
+import { FileText, FileSpreadsheet, Printer, Trash2, Plus, RefreshCw, ChevronDown, ChevronUp, Coins } from 'lucide-react'
 import api from '../utils/api'
 import StatCard from '../components/common/StatCard'
 import Modal from '../components/common/Modal'
@@ -8,7 +8,6 @@ import { fmtPKR, fmtQAR, fmtDate } from '../utils/format'
 import { exportToPDF } from '../utils/exportPDF'
 import { downloadExcel } from '../utils/exportExcel'
 import toast from 'react-hot-toast'
-import { Coins } from 'lucide-react'
 
 export default function DirectPaymentPage() {
   const [records, setRecords] = useState([])
@@ -17,7 +16,7 @@ export default function DirectPaymentPage() {
   const [addModal, setAddModal] = useState(false)
   const [form, setForm] = useState({ personName: '', amount: '', rate: '', notes: '' })
   const [saving, setSaving] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState(null) // { recordId, depositId }
+  const [deleteTarget, setDeleteTarget] = useState(null) // { recordId, depositId?, personName?, mode: 'deposit'|'person' }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -49,22 +48,33 @@ export default function DirectPaymentPage() {
       setForm({ personName: '', amount: '', rate: '', notes: '' })
       setAddModal(false)
       load()
-    } catch(e) {
+    } catch (e) {
       toast.error(e.response?.data?.message || 'Error saving deposit')
     } finally {
       setSaving(false)
     }
   }
 
-  const deleteDeposit = async () => {
+  const handleDelete = async () => {
     if (!deleteTarget) return
     try {
-      await api.delete(`/direct-payment/${deleteTarget.recordId}/deposit/${deleteTarget.depositId}`)
-      toast.success('Deposit removed')
+      if (deleteTarget.mode === 'person') {
+        await api.delete(`/direct-payment/${deleteTarget.recordId}`)
+        toast.success(`"${deleteTarget.personName}" and all deposits deleted`)
+      } else {
+        const res = await api.delete(
+          `/direct-payment/${deleteTarget.recordId}/deposit/${deleteTarget.depositId}`
+        )
+        if (res.data.deleted) {
+          toast.success('Last deposit removed — person record also deleted')
+        } else {
+          toast.success('Deposit removed')
+        }
+      }
       setDeleteTarget(null)
       load()
     } catch {
-      toast.error('Failed to delete deposit')
+      toast.error('Failed to delete')
     }
   }
 
@@ -96,16 +106,6 @@ export default function DirectPaymentPage() {
         d.notes || '—'
       ])
     )
-    // Summary rows per person
-    const summaryRows = records.map(r => [
-      r.personName,
-      `${r.deposits?.length || 0} entries`,
-      fmtQAR(r.totalDeposited),
-      r.weightedAvgRate?.toFixed(4),
-      fmtQAR(r.remainingBalance),
-      fmtQAR(r.totalUsed)
-    ])
-
     exportToPDF({
       title: 'Direct Payment (QAR Deposits) Report',
       headers: ['Person', 'Date', 'Amount (QAR)', 'Rate (₨)', 'PKR Value', 'Notes'],
@@ -148,37 +148,40 @@ export default function DirectPaymentPage() {
 
   return (
     <div className="space-y-4">
+
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <StatCard label="Total Deposited" value={fmtQAR(totalDeposited)} icon={Coins} color="blue" sub={`${records.length} persons`}/>
-        <StatCard label="Total Remaining" value={fmtQAR(totalRemaining)} color="green"/>
-        <StatCard label="Total Used" value={fmtQAR(totalUsed)} color="red"/>
+        <StatCard label="Total Deposited"  value={fmtQAR(totalDeposited)} icon={Coins} color="blue" sub={`${records.length} persons`} />
+        <StatCard label="Total Remaining"  value={fmtQAR(totalRemaining)} color="green" />
+        <StatCard label="Total Used"       value={fmtQAR(totalUsed)}      color="red" />
       </div>
 
       {/* Toolbar */}
       <div className="card p-3 flex items-center gap-2 flex-wrap">
-        <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Direct Payment Records (QAR)</span>
+        <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+          Direct Payment Records (QAR)
+        </span>
         <div className="ml-auto flex gap-2 flex-wrap">
           <button onClick={load} className="btn-secondary text-xs py-1.5" title="Refresh">
-            <RefreshCw size={13} className={loading ? 'animate-spin' : ''}/>Refresh
+            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
           </button>
           <button onClick={exportPDF} className="btn-secondary text-xs py-1.5">
-            <FileText size={13}/>Detail PDF
+            <FileText size={13} /> Detail PDF
           </button>
           <button onClick={exportSummaryPDF} className="btn-secondary text-xs py-1.5">
-            <FileText size={13}/>Summary PDF
+            <FileText size={13} /> Summary PDF
           </button>
           <button onClick={exportExcel} className="btn-secondary text-xs py-1.5">
-            <FileSpreadsheet size={13}/>Detail Excel
+            <FileSpreadsheet size={13} /> Detail Excel
           </button>
           <button onClick={exportSummaryExcel} className="btn-secondary text-xs py-1.5">
-            <FileSpreadsheet size={13}/>Summary Excel
+            <FileSpreadsheet size={13} /> Summary Excel
           </button>
-          <button onClick={()=>window.print()} className="btn-secondary text-xs py-1.5">
-            <Printer size={13}/>Print
+          <button onClick={() => window.print()} className="btn-secondary text-xs py-1.5">
+            <Printer size={13} /> Print
           </button>
-          <button onClick={()=>setAddModal(true)} className="btn-primary text-xs py-1.5">
-            <Plus size={13}/>New Deposit
+          <button onClick={() => setAddModal(true)} className="btn-primary text-xs py-1.5">
+            <Plus size={13} /> New Deposit
           </button>
         </div>
       </div>
@@ -192,7 +195,7 @@ export default function DirectPaymentPage() {
           <table className="w-full">
             <thead>
               <tr>
-                <th className="th"></th>
+                <th className="th" />
                 <th className="th">Person</th>
                 <th className="th">Entries</th>
                 <th className="th">Total Deposited (QAR)</th>
@@ -200,30 +203,42 @@ export default function DirectPaymentPage() {
                 <th className="th">PKR Value</th>
                 <th className="th">Used (QAR)</th>
                 <th className="th">Remaining (QAR)</th>
+                <th className="th">Action</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={8} className="td text-center py-12">
-                  <div className="flex items-center justify-center gap-2 text-gray-400">
-                    <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"/>
-                    Loading...
-                  </div>
-                </td></tr>
+                <tr>
+                  <td colSpan={9} className="td text-center py-12">
+                    <div className="flex items-center justify-center gap-2 text-gray-400">
+                      <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                      Loading...
+                    </div>
+                  </td>
+                </tr>
               ) : records.length === 0 ? (
-                <tr><td colSpan={8} className="td text-center py-12 text-gray-400">
-                  No deposit records yet. Click "+ New Deposit" to add your first entry.
-                </td></tr>
+                <tr>
+                  <td colSpan={9} className="td text-center py-12 text-gray-400">
+                    No deposit records yet. Click "+ New Deposit" to add your first entry.
+                  </td>
+                </tr>
               ) : (
                 records.map(record => {
-                  const pkrTotal = (record.deposits || []).reduce((s, d) => s + (d.pkrValue || d.amount * d.rate || 0), 0)
+                  const pkrTotal = (record.deposits || []).reduce(
+                    (s, d) => s + (d.pkrValue || d.amount * d.rate || 0), 0
+                  )
                   const isOpen = expanded[record._id]
+
                   return [
-                    // Summary row
-                    <tr key={record._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 cursor-pointer" onClick={()=>toggleExpand(record._id)}>
+                    /* ── Person summary row ── */
+                    <tr
+                      key={record._id}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-800/30 cursor-pointer"
+                      onClick={() => toggleExpand(record._id)}
+                    >
                       <td className="td w-8">
                         <span className="text-gray-400">
-                          {isOpen ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+                          {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                         </span>
                       </td>
                       <td className="td">
@@ -240,12 +255,28 @@ export default function DirectPaymentPage() {
                       <td className="td text-indigo-600">{fmtPKR(pkrTotal)}</td>
                       <td className="td text-red-500">{fmtQAR(record.totalUsed)}</td>
                       <td className="td font-semibold text-green-600">{fmtQAR(record.remainingBalance)}</td>
+                      <td className="td" onClick={e => e.stopPropagation()}>
+                        <button
+                          onClick={e => {
+                            e.stopPropagation()
+                            setDeleteTarget({
+                              recordId: record._id,
+                              personName: record.personName,
+                              mode: 'person'
+                            })
+                          }}
+                          className="p-1.5 rounded hover:bg-red-100 text-red-400 hover:text-red-600 transition"
+                          title="Delete this person and all their deposits"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
                     </tr>,
 
-                    // Expanded deposit rows
+                    /* ── Expanded deposit rows ── */
                     isOpen && (
                       <tr key={`${record._id}-detail`}>
-                        <td colSpan={8} className="p-0">
+                        <td colSpan={9} className="p-0">
                           <div className="bg-blue-50/50 dark:bg-blue-900/10 border-t border-b border-blue-100 dark:border-blue-900/30">
                             <table className="w-full">
                               <thead>
@@ -260,10 +291,17 @@ export default function DirectPaymentPage() {
                               </thead>
                               <tbody>
                                 {(record.deposits || []).length === 0 ? (
-                                  <tr><td colSpan={6} className="td text-center py-4 text-gray-400 pl-16 text-xs">No deposits yet</td></tr>
+                                  <tr>
+                                    <td colSpan={6} className="td text-center py-4 text-gray-400 pl-16 text-xs">
+                                      No deposits yet
+                                    </td>
+                                  </tr>
                                 ) : (
                                   (record.deposits || []).map((dep, i) => (
-                                    <tr key={dep._id || i} className="hover:bg-blue-100/30 dark:hover:bg-blue-900/10">
+                                    <tr
+                                      key={dep._id || i}
+                                      className="hover:bg-blue-100/30 dark:hover:bg-blue-900/10"
+                                    >
                                       <td className="td pl-16 text-xs text-gray-400">{fmtDate(dep.date)}</td>
                                       <td className="td font-medium">{fmtQAR(dep.amount)}</td>
                                       <td className="td font-mono text-sm">₨{dep.rate?.toFixed(4)}</td>
@@ -271,11 +309,18 @@ export default function DirectPaymentPage() {
                                       <td className="td text-xs text-gray-400">{dep.notes || '—'}</td>
                                       <td className="td">
                                         <button
-                                          onClick={e => { e.stopPropagation(); setDeleteTarget({ recordId: record._id, depositId: dep._id }) }}
+                                          onClick={e => {
+                                            e.stopPropagation()
+                                            setDeleteTarget({
+                                              recordId: record._id,
+                                              depositId: dep._id,
+                                              mode: 'deposit'
+                                            })
+                                          }}
                                           className="p-1.5 rounded hover:bg-red-100 text-red-500 transition"
                                           title="Delete this deposit"
                                         >
-                                          <Trash2 size={13}/>
+                                          <Trash2 size={13} />
                                         </button>
                                       </td>
                                     </tr>
@@ -288,8 +333,8 @@ export default function DirectPaymentPage() {
                                   <td className="td font-semibold text-blue-600">{fmtQAR(record.totalDeposited)}</td>
                                   <td className="td font-semibold">Avg: ₨{record.weightedAvgRate?.toFixed(4)}</td>
                                   <td className="td font-semibold text-indigo-600">{fmtPKR(pkrTotal)}</td>
-                                  <td className="td"></td>
-                                  <td className="td"></td>
+                                  <td className="td" />
+                                  <td className="td" />
                                 </tr>
                               </tfoot>
                             </table>
@@ -301,19 +346,29 @@ export default function DirectPaymentPage() {
                 })
               )}
             </tbody>
+
             {records.length > 0 && (
               <tfoot>
                 <tr className="bg-gray-100 dark:bg-gray-800 font-semibold">
-                  <td className="td"></td>
+                  <td className="td" />
                   <td className="td text-sm font-bold">Grand Total</td>
-                  <td className="td text-center">{records.reduce((s,r)=>s+(r.deposits?.length||0),0)}</td>
+                  <td className="td text-center">
+                    {records.reduce((s, r) => s + (r.deposits?.length || 0), 0)}
+                  </td>
                   <td className="td text-blue-600">{fmtQAR(totalDeposited)}</td>
                   <td className="td">—</td>
                   <td className="td text-indigo-600">
-                    {fmtPKR(records.reduce((s,r)=>(r.deposits||[]).reduce((ss,d)=>ss+(d.pkrValue||d.amount*d.rate||0),s),0))}
+                    {fmtPKR(
+                      records.reduce(
+                        (s, r) => (r.deposits || []).reduce(
+                          (ss, d) => ss + (d.pkrValue || d.amount * d.rate || 0), s
+                        ), 0
+                      )
+                    )}
                   </td>
                   <td className="td text-red-500">{fmtQAR(totalUsed)}</td>
                   <td className="td text-green-600">{fmtQAR(totalRemaining)}</td>
+                  <td className="td" />
                 </tr>
               </tfoot>
             )}
@@ -321,27 +376,53 @@ export default function DirectPaymentPage() {
         </div>
       </div>
 
-      {/* Add Deposit Modal */}
-      <Modal open={addModal} onClose={()=>setAddModal(false)} title="New QAR Deposit Entry">
+      {/* ── Add Deposit Modal ── */}
+      <Modal open={addModal} onClose={() => setAddModal(false)} title="New QAR Deposit Entry">
         <div className="space-y-3">
           <div>
             <label className="label">Person Name</label>
-            <input className="input" value={form.personName} onChange={e=>setForm({...form,personName:e.target.value})} placeholder="e.g. Zaz, Fawad"/>
-            <p className="text-xs text-gray-400 mt-1">If person already exists, deposit will be added to their record.</p>
+            <input
+              className="input"
+              value={form.personName}
+              onChange={e => setForm({ ...form, personName: e.target.value })}
+              placeholder="e.g. Zaz, Fawad"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              If person already exists, deposit will be added to their record.
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">Amount (QAR)</label>
-              <input className="input" type="number" value={form.amount} onChange={e=>setForm({...form,amount:e.target.value})} placeholder="4000" step="0.01"/>
+              <input
+                className="input"
+                type="number"
+                value={form.amount}
+                onChange={e => setForm({ ...form, amount: e.target.value })}
+                placeholder="4000"
+                step="0.01"
+              />
             </div>
             <div>
               <label className="label">Rate (₨ per QAR)</label>
-              <input className="input" type="number" value={form.rate} onChange={e=>setForm({...form,rate:e.target.value})} placeholder="77.60" step="0.01"/>
+              <input
+                className="input"
+                type="number"
+                value={form.rate}
+                onChange={e => setForm({ ...form, rate: e.target.value })}
+                placeholder="77.60"
+                step="0.01"
+              />
             </div>
           </div>
           <div>
             <label className="label">Notes (Optional)</label>
-            <input className="input" value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} placeholder="e.g. First batch"/>
+            <input
+              className="input"
+              value={form.notes}
+              onChange={e => setForm({ ...form, notes: e.target.value })}
+              placeholder="e.g. First batch"
+            />
           </div>
 
           {form.amount && form.rate && (
@@ -362,24 +443,28 @@ export default function DirectPaymentPage() {
           )}
 
           <div className="flex justify-end gap-2 pt-1">
-            <button onClick={()=>setAddModal(false)} className="btn-secondary">Cancel</button>
+            <button onClick={() => setAddModal(false)} className="btn-secondary">Cancel</button>
             <button onClick={save} disabled={saving} className="btn-primary">
               {saving
-                ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/>
-                : <><Plus size={13}/>Save Deposit</>
+                ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                : <><Plus size={13} />Save Deposit</>
               }
             </button>
           </div>
         </div>
       </Modal>
 
-      {/* Delete Confirm */}
+      {/* ── Delete Confirm ── */}
       <ConfirmDialog
         open={!!deleteTarget}
-        onClose={()=>setDeleteTarget(null)}
-        onConfirm={deleteDeposit}
-        title="Delete Deposit"
-        message="This will permanently remove this deposit entry. The person's totals and weighted average rate will be recalculated automatically."
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title={deleteTarget?.mode === 'person' ? 'Delete Person Record' : 'Delete Deposit'}
+        message={
+          deleteTarget?.mode === 'person'
+            ? `This will permanently delete "${deleteTarget?.personName}" and ALL their deposit entries. This cannot be undone.`
+            : 'This will remove this deposit entry. If it is the last deposit, the person record will also be deleted automatically.'
+        }
         confirmText="Delete"
         danger
       />
