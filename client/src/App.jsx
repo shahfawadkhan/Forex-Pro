@@ -11,6 +11,7 @@ import DirhamPage from './pages/DirhamPage'
 import PKRPage from './pages/PKRPage'
 import AdvancePage from './pages/AdvancePage'
 import DirectPaymentPage from './pages/DirectPaymentPage'
+import RiyalSaudiPage from './pages/RiyalsaudiPage'
 import LoansPage from './pages/LoansPage'
 import VillagePage from './pages/VillagePage'
 import ProfitPage from './pages/ProfitPage'
@@ -26,10 +27,7 @@ function ProtectedRoute({ children }) {
 export default function App() {
   const dispatch = useDispatch()
   const { token } = useSelector(s => s.auth)
-
-  useEffect(() => {
-    if (token) dispatch(getMe())
-  }, [token])
+  useEffect(() => { if (token) dispatch(getMe()) }, [token])
 
   return (
     <Routes>
@@ -38,19 +36,20 @@ export default function App() {
         <ProtectedRoute>
           <Layout>
             <Routes>
-              <Route path="/" element={<DashboardPage/>}/>
-              <Route path="/new-transaction" element={<NewTransactionPage/>}/>
-              <Route path="/riyal" element={<RiyalPage/>}/>
-              <Route path="/dirham" element={<DirhamPage/>}/>
-              <Route path="/pkr" element={<PKRPage/>}/>
-              <Route path="/advance" element={<AdvancePage/>}/>
-              <Route path="/direct-payment" element={<DirectPaymentPage/>}/>
-              <Route path="/loans" element={<LoansPage/>}/>
-              <Route path="/village" element={<VillagePage/>}/>
-              <Route path="/profit" element={<ProfitPage/>}/>
-              <Route path="/reports" element={<ReportsPage/>}/>
-              <Route path="/settings" element={<SettingsPage/>}/>
-              <Route path="*" element={<Navigate to="/" replace/>}/>
+              <Route path="/"                  element={<DashboardPage/>}/>
+              <Route path="/new-transaction"   element={<NewTransactionPage/>}/>
+              <Route path="/riyal"             element={<RiyalPage/>}/>
+              <Route path="/dirham"            element={<DirhamPage/>}/>
+              <Route path="/pkr"               element={<PKRPage/>}/>
+              <Route path="/advance"           element={<AdvancePage/>}/>
+              <Route path="/direct-payment"    element={<DirectPaymentPage/>}/>
+              <Route path="/riyal-saudi"       element={<RiyalSaudiPage/>}/>
+              <Route path="/loans"             element={<LoansPage/>}/>
+              <Route path="/village"           element={<VillagePage/>}/>
+              <Route path="/profit"            element={<ProfitPage/>}/>
+              <Route path="/reports"           element={<ReportsPage/>}/>
+              <Route path="/settings"          element={<SettingsPage/>}/>
+              <Route path="*"                  element={<Navigate to="/" replace/>}/>
             </Routes>
           </Layout>
         </ProtectedRoute>

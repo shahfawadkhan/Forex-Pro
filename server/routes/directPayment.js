@@ -8,7 +8,7 @@ router.get('/',                          c.getAll);
 router.get('/:id',                       c.getOne);
 router.post('/deposit',                  c.addDeposit);
 router.post('/convert',                  c.convert);
-router.delete('/:id',                    c.deletePerson);        // ← NEW
-router.delete('/:id/deposit/:depositId', c.deleteDeposit);
+router.delete('/:id',                    c.deletePerson);               // delete whole person
+router.delete('/:id/deposit/:depositId', c.deleteDeposit);              // delete one deposit
 
 module.exports = router;
