@@ -1,61 +1,60 @@
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
-import { AppProvider } from './context/AppContext';
-import Sidebar from './components/Sidebar';
-import Dashboard from './pages/Dashboard';
-import Transactions from './pages/Transactions';
-import Persons from './pages/Persons';
-import PersonLedger from './pages/PersonLedger';
-import Payments from './pages/Payments';
-import Accounts from './pages/Accounts';
-import Reports from './pages/Reports';
-import Loans from './pages/Loans';
-import Village from './pages/Village';
-import Login from './pages/Login';
+import { useEffect } from 'react'
+import { Routes, Route, Navigate } from 'react-router-dom'
+import { useDispatch, useSelector } from 'react-redux'
+import { getMe } from './store/slices/authSlice'
+import Layout from './components/layout/Layout'
+import LoginPage from './pages/LoginPage'
+import DashboardPage from './pages/DashboardPage'
+import NewTransactionPage from './pages/NewTransactionPage'
+import RiyalPage from './pages/RiyalPage'
+import DirhamPage from './pages/DirhamPage'
+import PKRPage from './pages/PKRPage'
+import AdvancePage from './pages/AdvancePage'
+import DirectPaymentPage from './pages/DirectPaymentPage'
+import LoansPage from './pages/LoansPage'
+import VillagePage from './pages/VillagePage'
+import ProfitPage from './pages/ProfitPage'
+import ReportsPage from './pages/ReportsPage'
+import SettingsPage from './pages/SettingsPage'
 
-const isAuthenticated = () => !!localStorage.getItem('token');
-
-function ProtectedRoute() {
-  if (!isAuthenticated()) return <Navigate to="/login" replace />;
-  return (
-    <AppProvider>
-      <div className="flex h-screen overflow-hidden">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto p-6 lg:p-8">
-          <div className="max-w-7xl mx-auto">
-            <Outlet />
-          </div>
-        </main>
-      </div>
-    </AppProvider>
-  );
+function ProtectedRoute({ children }) {
+  const { token } = useSelector(s => s.auth)
+  if (!token) return <Navigate to="/login" replace/>
+  return children
 }
 
 export default function App() {
+  const dispatch = useDispatch()
+  const { token } = useSelector(s => s.auth)
+
+  useEffect(() => {
+    if (token) dispatch(getMe())
+  }, [token])
+
   return (
-    <BrowserRouter>
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          style: { background: '#1a1d27', color: '#fff', border: '1px solid #2a2e42', fontSize: '13px' },
-          success: { iconTheme: { primary: '#d4a843', secondary: '#000' } },
-        }}
-      />
-      <Routes>
-        <Route path="/login" element={isAuthenticated() ? <Navigate to="/" /> : <Login />} />
-        <Route element={<ProtectedRoute />}>
-          <Route path="/"                        element={<Dashboard />} />
-          <Route path="/transactions"            element={<Transactions />} />
-          <Route path="/persons"                 element={<Persons />} />
-          <Route path="/persons/:id/ledger"      element={<PersonLedger />} />
-          <Route path="/payments"                element={<Payments />} />
-          <Route path="/accounts"                element={<Accounts />} />
-          <Route path="/loans"                   element={<Loans />} />
-          <Route path="/village"                 element={<Village />} />
-          <Route path="/reports"                 element={<Reports />} />
-        </Route>
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
-    </BrowserRouter>
-  );
+    <Routes>
+      <Route path="/login" element={<LoginPage/>}/>
+      <Route path="/*" element={
+        <ProtectedRoute>
+          <Layout>
+            <Routes>
+              <Route path="/" element={<DashboardPage/>}/>
+              <Route path="/new-transaction" element={<NewTransactionPage/>}/>
+              <Route path="/riyal" element={<RiyalPage/>}/>
+              <Route path="/dirham" element={<DirhamPage/>}/>
+              <Route path="/pkr" element={<PKRPage/>}/>
+              <Route path="/advance" element={<AdvancePage/>}/>
+              <Route path="/direct-payment" element={<DirectPaymentPage/>}/>
+              <Route path="/loans" element={<LoansPage/>}/>
+              <Route path="/village" element={<VillagePage/>}/>
+              <Route path="/profit" element={<ProfitPage/>}/>
+              <Route path="/reports" element={<ReportsPage/>}/>
+              <Route path="/settings" element={<SettingsPage/>}/>
+              <Route path="*" element={<Navigate to="/" replace/>}/>
+            </Routes>
+          </Layout>
+        </ProtectedRoute>
+      }/>
+    </Routes>
+  )
 }

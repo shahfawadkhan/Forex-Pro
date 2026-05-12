@@ -1,0 +1,10 @@
+const router = require('express').Router();
+const c = require('../controllers/directPaymentController');
+const { protect } = require('../middleware/auth');
+router.use(protect);
+router.get('/', c.getAll);
+router.get('/:id', c.getOne);
+router.post('/deposit', c.addDeposit);
+router.post('/convert', c.convert);
+router.delete('/:id/deposit/:depositId', c.deleteDeposit);
+module.exports = router;

@@ -1,84 +1,87 @@
-# ForexPro — Currency Exchange Management System
+# ForexPro — Forex Money Exchange Management System
 
-A full-stack MERN application for managing AED/SAR/PKR currency exchange transactions.
+A full-stack MERN application for managing Forex/Money Exchange operations.
 
-## 🚀 Quick Start
+## Tech Stack
+- **Frontend**: React (Vite) + Tailwind CSS + Redux Toolkit
+- **Backend**: Node.js + Express.js + MongoDB
+- **Auth**: JWT Authentication with role-based access
+- **Exports**: Excel (xlsx) + PDF (jsPDF + autoTable)
+
+## Quick Start
 
 ### Prerequisites
-- Node.js 18+
-- MongoDB (local or Atlas)
-- npm
+- Node.js v18+
+- MongoDB (local or MongoDB Atlas)
 
-### Option 1: Local Development
+### 1. Clone / Extract the project
 
-**Backend:**
+### 2. Setup Server
 ```bash
 cd server
-cp .env.example .env        # Edit MONGO_URI and JWT_SECRET
+cp .env.example .env
+# Edit .env and set your MONGO_URI and JWT_SECRET
 npm install
-npm run dev                  # Runs on http://localhost:5000
+node seed.js        # Creates default admin user
+npm run dev         # Starts server on port 5000
 ```
 
-**Frontend:**
+### 3. Setup Client
 ```bash
 cd client
 npm install
-npm run dev                  # Runs on http://localhost:5173
+npm run dev         # Starts frontend on port 5173
 ```
 
-### Option 2: Docker Compose
-```bash
-docker-compose up -d
-# Frontend: http://localhost:3000
-# Backend:  http://localhost:5000
+### 4. Login
+- URL: http://localhost:5173
+- Email: admin@forexpro.com
+- Password: password123
+
+## Features
+- Dashboard with profit charts and summaries
+- Riyal (SAR) transactions — buy/sell with auto profit calculation
+- Dirham (AED) transactions — buy/sell with payment tracking
+- PKR transactions with margin-based profit
+- Advance records with partial deduction support
+- Riyal-to-Saudi conversion with 0.95 factor and weighted average rate
+- Loan management (given & taken) with repayment tracking
+- Village Account ledger with deposit/withdrawal history
+- Profit management with hide/show toggle and reset
+- Full Excel & PDF export on every module
+- Dark/Light mode
+- JWT auth with role-based access (admin, manager, viewer)
+
+## API Endpoints
+- `POST /api/auth/register` — Register user
+- `POST /api/auth/login` — Login
+- `GET /api/dashboard` — Dashboard stats
+- `GET/POST /api/riyal` — Riyal transactions
+- `GET/POST /api/dirham` — Dirham transactions
+- `GET/POST /api/pkr` — PKR transactions
+- `GET/POST /api/advance` — Advance records
+- `GET/POST /api/loans` — Loan management
+- `GET/POST /api/village` — Village account
+- `GET /api/profit/summary` — Profit summary
+- `POST /api/reports/generate` — Generate Excel reports
+
+## Folder Structure
 ```
-
-## 🔐 Default Login
-- **Username:** `admin`
-- **Password:** `password`
-
-> Change in production: hash your password with bcrypt and update `ADMIN_PASS` in `.env`
-
-## 📋 Features
-
-### Party Management
-- Add/edit/delete persons (Buyer/Seller/Both)
-- Running balance tracking per person
-- Full ledger view with Dr/Cr running balance
-
-### Transactions (AED & SAR)
-- Buy / Sell transactions
-- Manual rate entry
-- Auto PKR calculation
-- Profit tracking per transaction (with buying rate input)
-
-### Payments
-- Record cash/bank payments received or paid
-- Auto-updates person balance and account balance
-
-### Accounts
-- Cash accounts (Peshawar, Village, etc.)
-- Bank accounts (HBL, Meezan, etc.)
-- Real-time balance tracking
-
-### Reports
-- Dashboard with daily/monthly stats
-- Interactive profit charts
-- Date range filtering
-- CSV export
-
-## 🗄️ Data Models
-
+forexpro/
+├── server/
+│   ├── models/         MongoDB schemas
+│   ├── controllers/    Business logic
+│   ├── routes/         API routes
+│   ├── middleware/     Auth middleware
+│   ├── utils/          Excel exporter, profit calculator
+│   ├── index.js        Entry point
+│   └── seed.js         Seed admin user
+└── client/
+    ├── src/
+    │   ├── pages/      All page components
+    │   ├── components/ Reusable UI components
+    │   ├── store/      Redux store + slices
+    │   ├── utils/      API client, formatters, exporters
+    │   └── hooks/      Custom hooks
+    └── index.html
 ```
-Person  → balance (+ = they owe us, - = we owe them)
-Transaction → linked to Person, affects balance
-Payment → linked to Person + Account, affects both
-Account → cash/bank balance tracking
-```
-
-## 🛠️ Tech Stack
-- **Frontend:** React 18 + Vite + Tailwind CSS + Recharts
-- **Backend:** Node.js + Express
-- **Database:** MongoDB + Mongoose
-- **Auth:** JWT (admin-only)
-- **Deploy:** Docker + Nginx

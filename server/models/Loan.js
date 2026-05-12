@@ -1,34 +1,35 @@
 const mongoose = require('mongoose');
 
-const repaymentSchema = new mongoose.Schema({
-  date:     { type: Date, required: true, default: Date.now },
-  amount:   { type: Number, required: true },
-  currency: { type: String, enum: ['PKR', 'AED', 'SAR'], default: 'PKR' },
-  notes:    { type: String, default: '' },
+const RepaymentSchema = new mongoose.Schema({
+  amount: { type: Number, required: true },
+  method: { type: String, enum: ['cash', 'village-account', 'bank', 'other'], default: 'cash' },
+  date: { type: Date, default: Date.now },
+  notes: String
+});
+
+const LoanSchema = new mongoose.Schema({
+  personName: { type: String, required: true, trim: true },
+  loanType: { type: String, enum: ['given', 'taken'], required: true },
+  amount: { type: Number, required: true, min: 0 },
+  currency: { type: String, enum: ['PKR', 'SAR', 'AED', 'QAR'], default: 'PKR' },
+  interestRate: { type: Number, default: 0 },
+  totalRepaid: { type: Number, default: 0 },
+  remaining: { type: Number },
+  repayments: [RepaymentSchema],
+  status: { type: String, enum: ['active', 'completed', 'overdue'], default: 'active' },
+  dueDate: { type: Date },
+  date: { type: Date, default: Date.now },
+  notes: { type: String, trim: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 
-const loanSchema = new mongoose.Schema({
-  date:      { type: Date, required: true, default: Date.now },
-  person:    { type: mongoose.Schema.Types.ObjectId, ref: 'Person', required: true },
-
-  // 'give' = we gave a loan to this person; 'take' = we took a loan from this person
-  direction: { type: String, enum: ['give', 'take'], required: true },
-
-  currency:  { type: String, enum: ['PKR', 'AED', 'SAR'], default: 'PKR' },
-  amount:    { type: Number, required: true },
-  remaining: { type: Number },   // kept in sync on each repayment
-
-  repayments: [repaymentSchema],
-
-  notes:    { type: String, default: '' },
-  isActive: { type: Boolean, default: true },
-  createdBy: { type: String, default: 'Admin' },
-}, { timestamps: true });
-
-loanSchema.pre('save', function (next) {
-  const paid = this.repayments.reduce((s, r) => s + r.amount, 0);
-  this.remaining = Math.max(0, this.amount - paid);
+LoanSchema.pre('save', function(next) {
+  this.totalRepaid = this.repayments.reduce((s, r) => s + r.amount, 0);
+  this.remaining = this.amount - this.totalRepaid;
+  if (this.remaining <= 0) this.status = 'completed';
+  else if (this.dueDate && new Date() > this.dueDate) this.status = 'overdue';
+  else this.status = 'active';
   next();
 });
 
-module.exports = mongoose.model('Loan', loanSchema);
+module.exports = mongoose.model('Loan', LoanSchema);

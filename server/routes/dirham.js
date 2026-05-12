@@ -1,0 +1,12 @@
+const router = require('express').Router();
+const c = require('../controllers/dirhamController');
+const { protect } = require('../middleware/auth');
+router.use(protect);
+router.get('/', c.getAll);
+router.get('/export', c.exportExcel);
+router.get('/:id', c.getOne);
+router.post('/', c.create);
+router.put('/:id', c.update);
+router.delete('/:id', c.delete);
+router.post('/:id/payment', c.makePayment);
+module.exports = router;
