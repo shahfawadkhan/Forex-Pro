@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, ArrowRight } from 'lucide-react'
+import { CheckCircle2, AlertTriangle, Banknote } from 'lucide-react'
 import api from '../utils/api'
-import { fmtPKR, fmtQAR, fmtAED } from '../utils/format'
+import { fmtPKR, fmtAED } from '../utils/format'
 import toast from 'react-hot-toast'
+import PersonSelect from './common/PersonSelect'
 
-// ─── Sub-tab button ────────────────────────────────────────────────────────────
 const SubBtn = ({ label, active, onClick }) => (
   <button
     onClick={onClick}
@@ -19,537 +19,409 @@ const SubBtn = ({ label, active, onClick }) => (
   </button>
 )
 
-// ─── DIRECT PAYMENT ENTRY ─────────────────────────────────────────────────────
-function DirectPaymentTab() {
+// ─── SAUDI-RIYAL SECTION ──────────────────────────────────────────────────────
+function SaudiRiyalSection({ loading, setLoading }) {
   const navigate = useNavigate()
-  const [form, setForm] = useState({ personName: '', amount: '', rate: '', notes: '' })
-  const [saving, setSaving] = useState(false)
-  const pkrValue = (Number(form.amount) || 0) * (Number(form.rate) || 0)
 
+  // ── Buy side
+  const [buyPerson, setBuyPerson] = useState('')
+  const [buyAmount, setBuyAmount] = useState('')   // QAR
+  const [buyRate,   setBuyRate]   = useState('')   // Rs per QAR
+
+  // ── Sell side
+  const [sellPerson, setSellPerson] = useState('')
+  const [sellRate,   setSellRate]   = useState('')  // Rs per AED
+
+  // ── Advance pool (separate section)
+  const [advanceRecords, setAdvanceRecords] = useState([])
+  const [advLoading,     setAdvLoading]     = useState(true)
+  const [selectedAdv,    setSelectedAdv]    = useState(null)
+
+  // ── Meta
+  const [notes, setNotes] = useState('')
+  const [date,  setDate]  = useState(new Date().toISOString().split('T')[0])
+
+  useEffect(() => {
+    setAdvLoading(true)
+    api.get('/advance')
+      .then(({ data: r }) =>
+        setAdvanceRecords((r.data || []).filter(a => (a.remainingAmount || 0) > 0))
+      )
+      .catch(() => toast.error('Failed to load advance records'))
+      .finally(() => setAdvLoading(false))
+  }, [])
+
+  // ── Derived values
+  const qar       = Number(buyAmount) || 0
+  const bRate     = Number(buyRate)   || 0
+  const sRate     = Number(sellRate)  || 0
+  const deductAED = +(qar * 0.95).toFixed(4)      // AED given to sell person
+  const wePayPKR  = qar * bRate                   // PKR we owe buy person
+  const theyPayPKR= deductAED * sRate             // PKR sell person owes us
+  const profit    = theyPayPKR - wePayPKR
+
+  const exceeds   = selectedAdv && deductAED > (selectedAdv.remainingAmount || 0)
+  const canSave   = buyPerson && sellPerson && qar > 0 && bRate > 0 && sRate > 0 && selectedAdv && !exceeds
+
+  // ── Save
   const save = async () => {
-    if (!form.personName || !form.amount || !form.rate)
-      return toast.error('Fill Person Name, Amount and Rate')
-    setSaving(true)
+    if (!canSave) return toast.error('Please fill all required fields')
+    setLoading(true)
     try {
-      await api.post('/direct-payment/deposit', {
-        personName: form.personName.trim(),
-        amount: Number(form.amount),
-        rate: Number(form.rate),
-        notes: form.notes
+      const tx = await api.post('/riyal', {
+        transactionType: 'riyal-to-saudi',
+        buyPerson,  buyAmount: qar,      buyRate: bRate,  buyTotal: wePayPKR,
+        sellPerson, sellAmount: deductAED, sellRate: sRate, sellTotal: theyPayPKR,
+        profit, notes, date,
       })
-      toast.success('Deposit saved!')
-      setForm({ personName: '', amount: '', rate: '', notes: '' })
+      await api.post(`/advance/${selectedAdv._id}/deduct`, {
+        aedAmount: deductAED,
+        linkedConversionId: tx.data.data?._id,
+        notes: `Saudi-Riyal — sold to ${sellPerson}, bought from ${buyPerson}`,
+      })
+      toast.success('Transaction saved & advance deducted!')
+      setBuyPerson(''); setBuyAmount(''); setBuyRate('')
+      setSellPerson(''); setSellRate('')
+      setSelectedAdv(null); setNotes('')
+      setDate(new Date().toISOString().split('T')[0])
+      const { data: r } = await api.get('/advance')
+      setAdvanceRecords((r.data || []).filter(a => (a.remainingAmount || 0) > 0))
+      navigate('/riyal')
     } catch (e) {
-      toast.error(e.response?.data?.message || 'Error saving deposit')
-    } finally { setSaving(false) }
+      toast.error(e.response?.data?.message || 'Error saving transaction')
+    } finally { setLoading(false) }
   }
 
   return (
-    <div className="space-y-4 max-w-2xl">
-      <div className="card p-4 space-y-4">
-        <div className="flex items-center justify-between">
-          <h4 className="text-sm font-semibold">New QAR Deposit Entry</h4>
-          <button onClick={() => navigate('/direct-payment')} className="btn-secondary text-xs py-1.5">
-            View All Records <ArrowRight size={12}/>
-          </button>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2">
-            <label className="label">Person Name</label>
-            <input
-              className="input"
-              value={form.personName}
-              onChange={e => setForm({ ...form, personName: e.target.value })}
-              placeholder="e.g. Fawad"
-            />
-            <p className="text-xs text-gray-400 mt-1">
-              If person already exists, this deposit will be added to their record.
-            </p>
+    <div className="space-y-5">
+
+      {/* ════════════════════════════════════════════
+          SECTION 1 — BUY & SELL (transaction sides)
+          ════════════════════════════════════════════ */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+        {/* ── BUY SIDE ── */}
+        <div className="rounded-2xl border-2 border-red-200 dark:border-red-900/50 overflow-hidden">
+          <div className="bg-red-600 px-4 py-3 flex items-center gap-2 text-white">
+            <span className="text-lg">↓</span>
+            <div>
+              <p className="text-sm font-bold uppercase tracking-wide">Buy Side</p>
+              <p className="text-[10px] text-red-200">We buy QAR — will pay them PKR</p>
+            </div>
           </div>
-          <div>
-            <label className="label">Amount (QAR)</label>
-            <input
-              className="input"
-              type="number"
-              value={form.amount}
-              onChange={e => setForm({ ...form, amount: e.target.value })}
-              placeholder="4000"
-              step="0.01"
-            />
-          </div>
-          <div>
-            <label className="label">Rate (Rs per QAR)</label>
-            <input
-              className="input"
-              type="number"
-              value={form.rate}
-              onChange={e => setForm({ ...form, rate: e.target.value })}
-              placeholder="77.60"
-              step="0.01"
-            />
-          </div>
-          <div className="col-span-2">
-            <label className="label">Notes (Optional)</label>
-            <input
-              className="input"
-              value={form.notes}
-              onChange={e => setForm({ ...form, notes: e.target.value })}
-              placeholder="e.g. First batch"
-            />
+          <div className="p-4 space-y-3">
+            <div>
+              <label className="label">Buy From (Person)</label>
+              <PersonSelect value={buyPerson} onChange={setBuyPerson} placeholder="Select person we buy from"/>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Amount (QAR)</label>
+                <input
+                  className="input" type="number" value={buyAmount}
+                  onChange={e => setBuyAmount(e.target.value)}
+                  placeholder="e.g. 5000" step="0.01"
+                />
+              </div>
+              <div>
+                <label className="label">Buy Rate (Rs / QAR)</label>
+                <input
+                  className="input" type="number" value={buyRate}
+                  onChange={e => setBuyRate(e.target.value)}
+                  placeholder="e.g. 76.50" step="0.0001"
+                />
+              </div>
+            </div>
+
+            {/* Summary */}
+            <div className={`rounded-xl p-4 text-center transition-all ${wePayPKR > 0 ? 'bg-red-600 text-white' : 'bg-gray-100 dark:bg-gray-800'}`}>
+              <p className={`text-[10px] uppercase tracking-wide mb-0.5 ${wePayPKR > 0 ? 'text-red-200' : 'text-gray-400'}`}>
+                We Will Pay Them
+              </p>
+              <p className={`text-2xl font-bold ${wePayPKR === 0 ? 'text-gray-400' : ''}`}>
+                {wePayPKR > 0 ? fmtPKR(wePayPKR) : '—'}
+              </p>
+              {wePayPKR > 0 && (
+                <p className="text-[10px] text-red-200 mt-1">{qar} QAR × ₨{bRate} = {fmtPKR(wePayPKR)}</p>
+              )}
+            </div>
           </div>
         </div>
 
-        {form.amount && form.rate && (
-          <div className="grid grid-cols-3 gap-3">
-            <div className="bg-blue-600 text-white rounded-xl p-3 text-center">
-              <div className="text-xs opacity-80">Deposited (QAR)</div>
-              <div className="text-lg font-bold">{fmtQAR(form.amount)}</div>
-            </div>
-            <div className="bg-indigo-600 text-white rounded-xl p-3 text-center">
-              <div className="text-xs opacity-80">Rate (Rs/QAR)</div>
-              <div className="text-lg font-bold">Rs{Number(form.rate).toFixed(4)}</div>
-            </div>
-            <div className="bg-green-600 text-white rounded-xl p-3 text-center">
-              <div className="text-xs opacity-80">PKR Value</div>
-              <div className="text-lg font-bold">{fmtPKR(pkrValue)}</div>
+        {/* ── SELL SIDE ── */}
+        <div className="rounded-2xl border-2 border-green-200 dark:border-green-900/50 overflow-hidden">
+          <div className="bg-green-600 px-4 py-3 flex items-center gap-2 text-white">
+            <span className="text-lg">↑</span>
+            <div>
+              <p className="text-sm font-bold uppercase tracking-wide">Sell Side</p>
+              <p className="text-[10px] text-green-200">We give them Dirham — they pay us PKR</p>
             </div>
           </div>
-        )}
+          <div className="p-4 space-y-3">
+            <div>
+              <label className="label">Sell To (Person)</label>
+              <PersonSelect value={sellPerson} onChange={setSellPerson} placeholder="Select person we sell to"/>
+            </div>
+            <div>
+              <label className="label">Sell Rate (Rs / AED)</label>
+              <input
+                className="input" type="number" value={sellRate}
+                onChange={e => setSellRate(e.target.value)}
+                placeholder="e.g. 79.50" step="0.0001"
+              />
+            </div>
 
-        <div className="flex justify-end">
-          <button onClick={save} disabled={saving} className="btn-primary">
-            {saving
-              ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/>
-              : <><Plus size={13}/>Save Deposit</>
-            }
-          </button>
+            {/* AED they will receive */}
+            {qar > 0 && (
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-xl p-3 text-xs space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">QAR bought</span>
+                  <span className="font-semibold">{qar.toLocaleString()} QAR</span>
+                </div>
+                <div className="flex justify-between items-center border-t border-amber-200 dark:border-amber-800/40 pt-1.5">
+                  <span className="text-gray-500 flex items-center gap-1">
+                    <Banknote size={11}/> Dirham they receive <span className="bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200 px-1 rounded font-bold">× 0.95</span>
+                  </span>
+                  <span className="font-bold text-amber-700 dark:text-amber-400">{fmtAED(deductAED)}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Summary */}
+            <div className={`rounded-xl p-4 text-center transition-all ${theyPayPKR > 0 ? 'bg-green-600 text-white' : 'bg-gray-100 dark:bg-gray-800'}`}>
+              <p className={`text-[10px] uppercase tracking-wide mb-0.5 ${theyPayPKR > 0 ? 'text-green-200' : 'text-gray-400'}`}>
+                They Will Pay Us
+              </p>
+              <p className={`text-2xl font-bold ${theyPayPKR === 0 ? 'text-gray-400' : ''}`}>
+                {theyPayPKR > 0 ? fmtPKR(theyPayPKR) : '—'}
+              </p>
+              {theyPayPKR > 0 && (
+                <p className="text-[10px] text-green-200 mt-1">{deductAED} AED × ₨{sRate} = {fmtPKR(theyPayPKR)}</p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
-        <p className="flex-1 text-sm text-blue-700 dark:text-blue-300">
-          To view, edit or export all deposit records, go to the <strong>Direct Payment</strong> page.
-        </p>
-        <button onClick={() => navigate('/direct-payment')} className="btn-primary text-xs py-1.5 flex-shrink-0">
-          Open Records <ArrowRight size={12}/>
+      {/* Conversion formula strip */}
+      {qar > 0 && (
+        <div className="bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 flex-wrap text-sm">
+          <span className="text-blue-600 font-mono font-semibold">{qar} QAR</span>
+          <span className="text-gray-400">×</span>
+          <span className="bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-xs font-bold px-2 py-0.5 rounded-full">0.95</span>
+          <span className="text-gray-400">=</span>
+          <span className="text-amber-600 font-mono font-bold">{deductAED} AED</span>
+          <span className="text-gray-300 mx-2">|</span>
+          <span className="text-gray-400 text-xs">This dirham amount is deducted from the advance pool below</span>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════
+          SECTION 2 — ADVANCE POOL (separate)
+          ════════════════════════════════════════════ */}
+      <div className="card overflow-hidden p-0">
+        {/* Header */}
+        <div className="px-4 py-3 bg-indigo-50 dark:bg-indigo-900/20 border-b border-indigo-100 dark:border-indigo-800/50 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-indigo-600"/>
+            <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">
+              Advance Pool — Select Dirham Source
+            </span>
+          </div>
+          {deductAED > 0 && (
+            <span className="text-xs bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full font-medium">
+              Need to deduct: {fmtAED(deductAED)}
+            </span>
+          )}
+        </div>
+
+        <div className="p-4">
+          {advLoading ? (
+            <div className="space-y-2">
+              {[1,2,3].map(i => <div key={i} className="h-16 bg-gray-100 dark:bg-gray-800 rounded-xl animate-pulse"/>)}
+            </div>
+          ) : advanceRecords.length === 0 ? (
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-5 text-center">
+              <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">No advance records with remaining balance</p>
+              <button onClick={() => navigate('/advance')} className="text-xs text-amber-600 underline mt-1">
+                Go to Advance page to add records →
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {advanceRecords.map(adv => {
+                const isSelected  = selectedAdv?._id === adv._id
+                const wouldExceed = deductAED > 0 && deductAED > (adv.remainingAmount || 0)
+                const pct         = Math.min(100, ((adv.remainingAmount / adv.aedAmount) * 100))
+
+                return (
+                  <button
+                    key={adv._id}
+                    onClick={() => setSelectedAdv(isSelected ? null : adv)}
+                    disabled={wouldExceed && !isSelected}
+                    className={`text-left rounded-xl border-2 p-3 transition-all ${
+                      isSelected
+                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 shadow-sm'
+                        : wouldExceed
+                        ? 'border-gray-100 dark:border-gray-800 opacity-35 cursor-not-allowed'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-indigo-300 dark:hover:border-indigo-700 hover:bg-indigo-50/40 dark:hover:bg-indigo-900/10'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-1.5">
+                        <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                          isSelected ? 'border-indigo-500 bg-indigo-500' : 'border-gray-300 dark:border-gray-600'
+                        }`}>
+                          {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white"/>}
+                        </div>
+                        <p className="text-sm font-semibold text-gray-800 dark:text-white leading-tight">{adv.personName}</p>
+                      </div>
+                      {wouldExceed && !isSelected && (
+                        <AlertTriangle size={12} className="text-red-400 flex-shrink-0 mt-0.5"/>
+                      )}
+                    </div>
+
+                    <div className="flex justify-between text-xs mb-1.5">
+                      <span className="text-gray-400">Available</span>
+                      <span className="font-bold text-indigo-600">{fmtAED(adv.remainingAmount)}</span>
+                    </div>
+                    <div className="flex justify-between text-[10px] text-gray-400 mb-1.5">
+                      <span>of {fmtAED(adv.aedAmount)} total</span>
+                      <span>₨{adv.rate?.toFixed(2)}/AED</span>
+                    </div>
+
+                    {/* Progress */}
+                    <div className="h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${isSelected ? 'bg-indigo-500' : 'bg-green-500'}`}
+                        style={{ width: `${pct.toFixed(1)}%` }}
+                      />
+                    </div>
+
+                    {/* After-deduction preview */}
+                    {isSelected && deductAED > 0 && !wouldExceed && (
+                      <div className="mt-2 pt-2 border-t border-indigo-200 dark:border-indigo-800 flex justify-between text-[10px]">
+                        <span className="text-gray-400">After deduction:</span>
+                        <span className="font-semibold text-indigo-600">
+                          {fmtAED(Math.max(0, (adv.remainingAmount || 0) - deductAED))} left
+                        </span>
+                      </div>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {exceeds && (
+            <div className="mt-3 flex items-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-3 text-xs text-red-700 dark:text-red-300">
+              <AlertTriangle size={14} className="flex-shrink-0"/>
+              Deduction needed ({fmtAED(deductAED)}) exceeds this record's available balance ({fmtAED(selectedAdv?.remainingAmount)})
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ════════════════════════════════════════════
+          SECTION 3 — PROFIT SUMMARY
+          ════════════════════════════════════════════ */}
+      {wePayPKR > 0 && theyPayPKR > 0 && !exceeds && (
+        <div className="card p-4">
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Profit Summary</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/40 rounded-xl p-3">
+              <p className="text-[10px] text-gray-400 uppercase mb-1">We Pay (Buy)</p>
+              <p className="text-base font-bold text-red-700 dark:text-red-400">{fmtPKR(wePayPKR)}</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">{qar} QAR × ₨{bRate}</p>
+            </div>
+            <div className="bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800/40 rounded-xl p-3">
+              <p className="text-[10px] text-gray-400 uppercase mb-1">We Receive (Sell)</p>
+              <p className="text-base font-bold text-green-700 dark:text-green-400">{fmtPKR(theyPayPKR)}</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">{deductAED} AED × ₨{sRate}</p>
+            </div>
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/40 rounded-xl p-3">
+              <p className="text-[10px] text-gray-400 uppercase mb-1">Dirham Used</p>
+              <p className="text-base font-bold text-amber-700 dark:text-amber-400">{fmtAED(deductAED)}</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">from {selectedAdv?.personName || 'advance'}</p>
+            </div>
+            <div className={`rounded-xl p-3 border ${profit >= 0 ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-800/40' : 'bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-800/40'}`}>
+              <p className="text-[10px] text-gray-400 uppercase mb-1">Net Profit</p>
+              <p className={`text-base font-bold ${profit >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
+                {fmtPKR(profit)}
+              </p>
+              <p className="text-[10px] text-gray-400 mt-0.5">{profit >= 0 ? '▲ Gain' : '▼ Loss'}</p>
+            </div>
+          </div>
+
+          <div className="mt-3 text-xs text-gray-400 font-mono bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
+            ({deductAED} AED × ₨{sRate}) − ({qar} QAR × ₨{bRate}) ={' '}
+            <strong className={profit >= 0 ? 'text-emerald-600' : 'text-red-600'}>{fmtPKR(profit)}</strong>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════
+          SECTION 4 — NOTES + SAVE
+          ════════════════════════════════════════════ */}
+      <div className="card p-4 space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label">Notes (optional)</label>
+            <input className="input" value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. Fawad → Ihsan"/>
+          </div>
+          <div>
+            <label className="label">Date</label>
+            <input className="input" type="date" value={date} onChange={e => setDate(e.target.value)}/>
+          </div>
+        </div>
+
+        {/* Checklist */}
+        <div className="flex flex-wrap gap-2">
+          {[
+            { ok: !!buyPerson,   label: 'Buy person' },
+            { ok: qar > 0,       label: 'QAR amount' },
+            { ok: bRate > 0,     label: 'Buy rate' },
+            { ok: !!sellPerson,  label: 'Sell person' },
+            { ok: sRate > 0,     label: 'Sell rate' },
+            { ok: !!selectedAdv, label: 'Advance selected' },
+            { ok: !exceeds,      label: 'Fits balance' },
+          ].map(({ ok, label }) => (
+            <span key={label} className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${
+              ok ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                 : 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500'
+            }`}>
+              {ok
+                ? <CheckCircle2 size={10}/>
+                : <div className="w-2.5 h-2.5 rounded-full border border-gray-300 dark:border-gray-600"/>
+              }
+              {label}
+            </span>
+          ))}
+        </div>
+
+        <button
+          onClick={save}
+          disabled={!canSave || loading}
+          className={`w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition ${
+            canSave && !loading
+              ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
+              : 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
+          }`}
+        >
+          {loading
+            ? <><div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"/>Saving…</>
+            : `✓ Save Saudi-Riyal Transaction${selectedAdv ? ` — Deduct ${fmtAED(deductAED)} from ${selectedAdv.personName}` : ''}`
+          }
         </button>
       </div>
     </div>
   )
 }
 
-// ─── CONVERSION TAB ───────────────────────────────────────────────────────────
-function ConversionTab() {
-  const [dpPersons, setDpPersons] = useState([])
-  const [advRecords, setAdvRecords] = useState([])
-  const [loadingData, setLoadingData] = useState(true)
-
-  const [dpId, setDpId] = useState('')
-  const [dpPerson, setDpPerson] = useState(null)
-  const [inputQAR, setInputQAR] = useState('')
-
-  const [advId, setAdvId] = useState('')
-  const [advRecord, setAdvRecord] = useState(null)
-
-  const [converting, setConverting] = useState(false)
-  const [result, setResult] = useState(null)
-
-  useEffect(() => {
-    setLoadingData(true)
-    Promise.all([
-      api.get('/direct-payment'),
-      api.get('/advance')
-    ])
-      .then(([dp, adv]) => {
-        setDpPersons(dp.data.data || [])
-        setAdvRecords(adv.data.data || [])
-      })
-      .catch(() => toast.error('Failed to load records'))
-      .finally(() => setLoadingData(false))
-  }, [])
-
-  useEffect(() => {
-    setDpPerson(dpId ? dpPersons.find(p => p._id === dpId) || null : null)
-    setResult(null)
-  }, [dpId, dpPersons])
-
-  useEffect(() => {
-    setAdvRecord(advId ? advRecords.find(a => a._id === advId) || null : null)
-    setResult(null)
-  }, [advId, advRecords])
-
-  const qar       = Number(inputQAR) || 0
-  const factor    = 0.95
-  const converted = +(qar * factor).toFixed(4)
-
-  const buyRate   = dpPerson?.weightedAvgRate || 0
-  const sellRate  = advRecord?.rate || 0
-
-  const costPKR    = converted * buyRate
-  const revenuePKR = converted * sellRate
-  const profit     = revenuePKR - costPKR
-
-  const exceedsDp  = qar > 0 && dpPerson  && qar > (dpPerson.remainingBalance || 0)
-  const exceedsAdv = converted > 0 && advRecord && converted > (advRecord.remainingAmount || 0)
-  const canConfirm = qar > 0 && dpId && advId && !exceedsDp && !exceedsAdv
-
-  const doConvert = async () => {
-    if (!canConfirm) return
-    setConverting(true)
-    try {
-      const { data } = await api.post('/direct-payment/convert', {
-        personId: dpId,
-        inputAmount: qar,
-        factor,
-        advanceDeductions: [{ advanceId: advId, aedAmount: converted }]
-      })
-      setResult(data.data)
-      toast.success('Conversion completed!')
-      const [dp, adv] = await Promise.all([api.get('/direct-payment'), api.get('/advance')])
-      setDpPersons(dp.data.data || [])
-      setAdvRecords(adv.data.data || [])
-      setDpId(''); setAdvId(''); setInputQAR('')
-    } catch (e) {
-      toast.error(e.response?.data?.message || 'Conversion failed')
-    } finally { setConverting(false) }
-  }
-
-  if (loadingData) return (
-    <div className="flex items-center justify-center py-20">
-      <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"/>
-    </div>
-  )
-
-  const availableDp  = dpPersons.filter(p  => (p.remainingBalance  || 0) > 0)
-  const availableAdv = advRecords.filter(a => (a.remainingAmount   || 0) > 0)
-
-  return (
-    <div className="space-y-4 max-w-3xl">
-
-      {/* ── SIDE-BY-SIDE PANEL ── */}
-      <div className="card overflow-hidden p-0">
-
-        {/* Column headers */}
-        <div className="grid grid-cols-2">
-          <div className="px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border-b border-r border-blue-100 dark:border-blue-800/50 flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-blue-600"/>
-            <span className="text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider">Buy Side — Direct Payment</span>
-          </div>
-          <div className="px-4 py-3 bg-green-50 dark:bg-green-900/20 border-b border-green-100 dark:border-green-800/50 flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-green-600"/>
-            <span className="text-xs font-bold text-green-700 dark:text-green-300 uppercase tracking-wider">Sell Side — Advance Record</span>
-          </div>
-        </div>
-
-        {/* Main two-column body */}
-        <div className="grid grid-cols-2 divide-x divide-gray-100 dark:divide-gray-800">
-
-          {/* ── LEFT: Direct Payment ── */}
-          <div className="p-4 space-y-3">
-            {availableDp.length === 0 ? (
-              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 text-amber-700 dark:text-amber-300 text-sm rounded-xl p-3">
-                No persons with remaining QAR balance. Add a deposit first.
-              </div>
-            ) : (
-              <>
-                <div>
-                  <label className="label">Select Person</label>
-                  <select
-                    className="input"
-                    value={dpId}
-                    onChange={e => { setDpId(e.target.value); setInputQAR('') }}
-                  >
-                    <option value="">— Select Person —</option>
-                    {availableDp.map(p => (
-                      <option key={p._id} value={p._id}>
-                        {p.personName} — {fmtQAR(p.remainingBalance)} remaining
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {dpPerson && (
-                  <div className="rounded-xl border border-blue-100 dark:border-blue-800/50 divide-y divide-blue-100 dark:divide-blue-800/50 text-xs overflow-hidden">
-                    <div className="flex justify-between items-center px-3 py-2">
-                      <span className="text-gray-400">Total deposited</span>
-                      <span className="font-semibold">{fmtQAR(dpPerson.totalDeposited)}</span>
-                    </div>
-                    <div className="flex justify-between items-center px-3 py-2 bg-blue-50 dark:bg-blue-900/20">
-                      <span className="text-gray-400">Remaining (we owe)</span>
-                      <span className="font-semibold text-blue-600">{fmtQAR(dpPerson.remainingBalance)}</span>
-                    </div>
-                    <div className="flex justify-between items-center px-3 py-2">
-                      <span className="text-gray-400">Avg buy rate</span>
-                      <span className="font-semibold text-blue-600">Rs{buyRate.toFixed(4)}</span>
-                    </div>
-                  </div>
-                )}
-
-                {dpPerson && (
-                  <div>
-                    <label className="label">Amount to Pay (QAR)</label>
-                    <input
-                      className="input"
-                      type="number"
-                      value={inputQAR}
-                      onChange={e => { setInputQAR(e.target.value); setResult(null) }}
-                      placeholder={`Max: ${dpPerson.remainingBalance}`}
-                      step="0.01"
-                    />
-                    {exceedsDp && (
-                      <p className="text-xs text-red-500 mt-1">
-                        Exceeds remaining balance ({fmtQAR(dpPerson.remainingBalance)})
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {qar > 0 && !exceedsDp && (
-                  <div className="bg-blue-600 text-white rounded-xl p-3 text-center">
-                    <div className="text-xs opacity-70 mb-0.5">Paying out</div>
-                    <div className="text-xl font-bold font-mono">{fmtQAR(qar)}</div>
-                    <div className="text-xs opacity-60 mt-0.5">@ Rs{buyRate.toFixed(4)} / QAR</div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* ── RIGHT: Advance Record ── */}
-          <div className={`p-4 space-y-3 transition-opacity ${(!qar || !dpPerson || exceedsDp) ? 'opacity-40 pointer-events-none' : ''}`}>
-            {availableAdv.length === 0 ? (
-              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 text-amber-700 dark:text-amber-300 text-sm rounded-xl p-3">
-                No advance records with remaining balance.
-              </div>
-            ) : (
-              <>
-                <div>
-                  <label className="label">Select Advance Record</label>
-                  <select
-                    className="input"
-                    value={advId}
-                    onChange={e => setAdvId(e.target.value)}
-                  >
-                    <option value="">— Select Record —</option>
-                    {availableAdv.map(a => (
-                      <option key={a._id} value={a._id}>
-                        {a.personName} — {fmtAED(a.remainingAmount)} available
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {advRecord && (
-                  <div className="rounded-xl border border-green-100 dark:border-green-800/50 divide-y divide-green-100 dark:divide-green-800/50 text-xs overflow-hidden">
-                    <div className="flex justify-between items-center px-3 py-2">
-                      <span className="text-gray-400">Total advance</span>
-                      <span className="font-semibold">{fmtAED(advRecord.aedAmount)}</span>
-                    </div>
-                    <div className="flex justify-between items-center px-3 py-2 bg-green-50 dark:bg-green-900/20">
-                      <span className="text-gray-400">Available</span>
-                      <span className="font-semibold text-green-600">{fmtAED(advRecord.remainingAmount)}</span>
-                    </div>
-                    <div className="flex justify-between items-center px-3 py-2">
-                      <span className="text-gray-400">Sell rate</span>
-                      <span className="font-semibold text-green-600">Rs{sellRate.toFixed(4)}</span>
-                    </div>
-                  </div>
-                )}
-
-                {converted > 0 && advRecord && !exceedsAdv && (
-                  <div className="bg-green-600 text-white rounded-xl p-3 text-center">
-                    <div className="text-xs opacity-70 mb-0.5">Deducting</div>
-                    <div className="text-xl font-bold font-mono">{fmtAED(converted)}</div>
-                    <div className="text-xs opacity-60 mt-0.5">@ Rs{sellRate.toFixed(4)} / AED</div>
-                  </div>
-                )}
-
-                {exceedsAdv && (
-                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-xs rounded-xl p-3">
-                    {fmtAED(converted)} exceeds available balance ({fmtAED(advRecord?.remainingAmount)}).
-                    Select a different record or reduce the QAR amount.
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* ── CONVERSION FORMULA STRIP ── */}
-        {qar > 0 && !exceedsDp && (
-          <div className="border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 px-4 py-2.5 flex items-center justify-center gap-2.5">
-            <span className="text-blue-600 font-semibold font-mono text-sm">{fmtQAR(qar)}</span>
-            <span className="text-gray-400 text-sm">×</span>
-            <span className="bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-xs font-bold px-2 py-0.5 rounded-full">0.95</span>
-            <span className="text-gray-400 text-sm">=</span>
-            <span className="text-green-600 font-bold font-mono text-sm">{fmtAED(converted)}</span>
-            <span className="text-xs text-gray-400 hidden sm:inline">to deduct from advance</span>
-          </div>
-        )}
-      </div>
-
-      {/* ── PROFIT SUMMARY ── */}
-      {qar > 0 && dpPerson && advRecord && !exceedsDp && !exceedsAdv && (
-        <div className="card p-4">
-          <h4 className="text-sm font-semibold mb-3">Profit Calculation</h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-            <div className="bg-blue-600 text-white rounded-xl p-3">
-              <div className="text-xs opacity-80">Pay (QAR → AED)</div>
-              <div className="text-base font-bold">{fmtQAR(qar)}</div>
-              <div className="text-xs opacity-60 mt-1">× 0.95 = {fmtAED(converted)}</div>
-            </div>
-            <div className="bg-red-500 text-white rounded-xl p-3">
-              <div className="text-xs opacity-80">Cost (Buy @ Rs{buyRate.toFixed(2)})</div>
-              <div className="text-base font-bold">{fmtPKR(costPKR)}</div>
-              <div className="text-xs opacity-60 mt-1">{fmtAED(converted)} × {buyRate.toFixed(4)}</div>
-            </div>
-            <div className="bg-green-600 text-white rounded-xl p-3">
-              <div className="text-xs opacity-80">Revenue (Sell @ Rs{sellRate.toFixed(2)})</div>
-              <div className="text-base font-bold">{fmtPKR(revenuePKR)}</div>
-              <div className="text-xs opacity-60 mt-1">{fmtAED(converted)} × {sellRate.toFixed(4)}</div>
-            </div>
-            <div className={`${profit >= 0 ? 'bg-emerald-600' : 'bg-red-600'} text-white rounded-xl p-3`}>
-              <div className="text-xs opacity-80">Net Profit</div>
-              <div className="text-base font-bold">{fmtPKR(profit)}</div>
-              <div className="text-xs opacity-60 mt-1">
-                Rs{(sellRate - buyRate).toFixed(4)} × {fmtAED(converted)}
-              </div>
-            </div>
-          </div>
-          <div className="text-xs text-gray-500 bg-gray-50 dark:bg-gray-800 rounded-lg p-2 font-mono">
-            ({fmtAED(converted)} × Rs{sellRate.toFixed(4)}) − ({fmtAED(converted)} × Rs{buyRate.toFixed(4)}) = {' '}
-            <strong className={profit >= 0 ? 'text-green-600' : 'text-red-600'}>{fmtPKR(profit)}</strong>
-          </div>
-        </div>
-      )}
-
-      {/* ── CONFIRM ── */}
-      {qar > 0 && dpPerson && advRecord && !exceedsDp && !exceedsAdv && (
-        <div className="card p-4">
-          <h4 className="text-sm font-semibold mb-3">Confirm Transaction</h4>
-          <div className="grid grid-cols-2 gap-6 bg-gray-50 dark:bg-gray-800 rounded-xl p-4 mb-4 text-xs">
-            <div className="space-y-1.5">
-              <div className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-2">Buy Side (Direct Payment)</div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Person:</span>
-                <strong>{dpPerson.personName}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">We Pay:</span>
-                <strong>{fmtQAR(qar)}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">After × 0.95:</span>
-                <strong>{fmtAED(converted)}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Buy Rate:</span>
-                <strong>Rs{buyRate.toFixed(4)}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Remaining after:</span>
-                <strong className="text-blue-600">
-                  {fmtQAR(Math.max(0, (dpPerson.remainingBalance || 0) - qar))}
-                </strong>
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <div className="text-[10px] font-bold text-green-600 uppercase tracking-wider mb-2">Sell Side (Advance)</div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Person:</span>
-                <strong>{advRecord.personName}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Deduct:</span>
-                <strong>{fmtAED(converted)}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Sell Rate:</span>
-                <strong>Rs{sellRate.toFixed(4)}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Remaining after:</span>
-                <strong className="text-green-600">
-                  {fmtAED(Math.max(0, (advRecord.remainingAmount || 0) - converted))}
-                </strong>
-              </div>
-            </div>
-            <div className="col-span-2 flex justify-between pt-2 border-t border-gray-200 dark:border-gray-700 text-sm font-bold">
-              <span>Net Profit:</span>
-              <strong className={profit >= 0 ? 'text-green-600' : 'text-red-600'}>
-                {fmtPKR(profit)}
-              </strong>
-            </div>
-          </div>
-
-          <button
-            onClick={doConvert}
-            disabled={converting}
-            className="btn-primary w-full justify-center py-3"
-          >
-            {converting
-              ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/>Processing...</>
-              : <>✓ Confirm — Pay {fmtAED(converted)} from {advRecord.personName}'s Advance</>
-            }
-          </button>
-        </div>
-      )}
-
-      {/* ── RESULT ── */}
-      {result && (
-        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4">
-          <div className="text-sm font-semibold text-green-800 dark:text-green-300 mb-3">
-            ✓ Conversion Successful!
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-            <div>
-              <div className="text-green-600 mb-0.5">Input (QAR)</div>
-              <div className="font-semibold">{fmtQAR(result.inputAmount)}</div>
-            </div>
-            <div>
-              <div className="text-green-600 mb-0.5">Converted (AED)</div>
-              <div className="font-semibold">{fmtAED(result.convertedAmount)}</div>
-            </div>
-            <div>
-              <div className="text-green-600 mb-0.5">Buy Rate</div>
-              <div className="font-semibold">Rs{result.buyRate?.toFixed(4)}</div>
-            </div>
-            <div>
-              <div className="text-green-600 mb-0.5">Sell Rate</div>
-              <div className="font-semibold">Rs{result.sellRate?.toFixed(4)}</div>
-            </div>
-            <div>
-              <div className="text-green-600 mb-0.5">Cost (PKR)</div>
-              <div className="font-semibold">{fmtPKR(result.costPKR)}</div>
-            </div>
-            <div>
-              <div className="text-green-600 mb-0.5">Revenue (PKR)</div>
-              <div className="font-semibold">{fmtPKR(result.revenuePKR)}</div>
-            </div>
-            <div className="col-span-2">
-              <div className="text-green-600 mb-0.5">Net Profit</div>
-              <div className={`font-bold text-sm ${result.netProfit >= 0 ? 'text-green-700' : 'text-red-600'}`}>
-                {fmtPKR(result.netProfit)}
-              </div>
-            </div>
-          </div>
-          <button
-            onClick={() => setResult(null)}
-            className="mt-3 btn-secondary text-xs py-1.5"
-          >
-            New Conversion
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ─── RIYAL TAB (main export) ──────────────────────────────────────────────────
 export default function RiyalTab({ loading, setLoading }) {
-  const navigate = useNavigate()
+  const navigate   = useNavigate()
   const [riyalSub, setRiyalSub] = useState('r2r')
-  const [saudiSub, setSaudiSub] = useState('direct')
 
   const [r2r, setR2r] = useState({
     buyPerson: '', buyAmount: '', buyRate: '',
@@ -576,19 +448,19 @@ export default function RiyalTab({ loading, setLoading }) {
   return (
     <div className="p-4">
       <div className="flex gap-2 mb-5">
-        <SubBtn label="Riyal to Riyal"  active={riyalSub === 'r2r'}   onClick={() => setRiyalSub('r2r')}/>
-        <SubBtn label="Riyal to Saudi"  active={riyalSub === 'saudi'} onClick={() => setRiyalSub('saudi')}/>
+        <SubBtn label="Riyal to Riyal" active={riyalSub === 'r2r'}   onClick={() => setRiyalSub('r2r')}/>
+        <SubBtn label="Saudi-Riyal"    active={riyalSub === 'saudi'} onClick={() => setRiyalSub('saudi')}/>
       </div>
 
+      {/* ── Riyal to Riyal ── */}
       {riyalSub === 'r2r' && (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            {/* Buy */}
             <div className="border border-red-200 dark:border-red-800/50 rounded-xl p-4 space-y-3">
               <h4 className="text-xs font-bold text-red-600 uppercase tracking-wide">↓ Buy Section</h4>
               <div>
                 <label className="label">Buy From</label>
-                <input className="input" value={r2r.buyPerson} onChange={e => setR2r({ ...r2r, buyPerson: e.target.value })} placeholder="Person name"/>
+                <PersonSelect value={r2r.buyPerson} onChange={v => setR2r({ ...r2r, buyPerson: v })} placeholder="Select buyer"/>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -605,12 +477,12 @@ export default function RiyalTab({ loading, setLoading }) {
                 <p className="text-xl font-bold">{fmtPKR(r2rBuyTotal)}</p>
               </div>
             </div>
-            {/* Sell */}
+
             <div className="border border-green-200 dark:border-green-800/50 rounded-xl p-4 space-y-3">
               <h4 className="text-xs font-bold text-green-600 uppercase tracking-wide">↑ Sell Section</h4>
               <div>
                 <label className="label">Sell To</label>
-                <input className="input" value={r2r.sellPerson} onChange={e => setR2r({ ...r2r, sellPerson: e.target.value })} placeholder="Person name"/>
+                <PersonSelect value={r2r.sellPerson} onChange={v => setR2r({ ...r2r, sellPerson: v })} placeholder="Select seller"/>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -642,8 +514,7 @@ export default function RiyalTab({ loading, setLoading }) {
               <p className="text-xs opacity-80">Date</p>
               <input
                 className="bg-white/20 text-white text-sm rounded-lg px-3 py-1.5 outline-none mt-1"
-                type="date"
-                value={r2r.date}
+                type="date" value={r2r.date}
                 onChange={e => setR2r({ ...r2r, date: e.target.value })}
               />
             </div>
@@ -663,15 +534,8 @@ export default function RiyalTab({ loading, setLoading }) {
       )}
 
       {riyalSub === 'saudi' && (
-        <div>
-          <div className="flex gap-2 mb-4">
-            <SubBtn label="Direct Payment"     active={saudiSub === 'direct'}     onClick={() => setSaudiSub('direct')}/>
-            <SubBtn label="Conversion (×0.95)" active={saudiSub === 'conversion'} onClick={() => setSaudiSub('conversion')}/>
-          </div>
-          {saudiSub === 'direct'     && <DirectPaymentTab/>}
-          {saudiSub === 'conversion' && <ConversionTab/>}
-        </div>
+        <SaudiRiyalSection loading={loading} setLoading={setLoading}/>
       )}
-    </div>  
+    </div>
   )
 }

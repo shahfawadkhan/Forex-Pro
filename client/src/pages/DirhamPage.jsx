@@ -10,6 +10,7 @@ import { fmtPKR, fmtAED, fmtDate } from '../utils/format'
 import { exportDirhamPDF } from '../utils/exportPDF'
 import { exportDirhamExcel } from '../utils/exportExcel'
 import toast from 'react-hot-toast'
+import PersonSelect from '../components/common/PersonSelect'
 
 const emptyForm = { buyPerson:'', buyAmount:'', buyRate:'', sellPerson:'', sellAmount:'', sellRate:'', notes:'', date: new Date().toISOString().split('T')[0] }
 
@@ -89,7 +90,7 @@ export default function DirhamPage() {
         <div className="grid grid-cols-2 gap-4">
           <div className="border border-red-200 dark:border-red-900 rounded-xl p-4 space-y-3">
             <h4 className="text-xs font-bold text-red-600 uppercase">↓ Buy Dirham</h4>
-            <div><label className="label">Buy From</label><input className="input" value={form.buyPerson} onChange={e=>setForm({...form,buyPerson:e.target.value})} placeholder="Person name"/></div>
+            <div><label className="label">Buy From</label><PersonSelect value={form.buyPerson} onChange={v=>setForm({...form,buyPerson:v})} placeholder="Select buyer"/></div>
             <div className="grid grid-cols-2 gap-2">
               <div><label className="label">Amount (AED)</label><input className="input" type="number" value={form.buyAmount} onChange={e=>setForm({...form,buyAmount:e.target.value})} placeholder="0"/></div>
               <div><label className="label">Buy Rate (₨)</label><input className="input" type="number" value={form.buyRate} onChange={e=>setForm({...form,buyRate:e.target.value})} placeholder="76.00"/></div>
@@ -98,7 +99,7 @@ export default function DirhamPage() {
           </div>
           <div className="border border-green-200 dark:border-green-900 rounded-xl p-4 space-y-3">
             <h4 className="text-xs font-bold text-green-600 uppercase">↑ Sell Dirham</h4>
-            <div><label className="label">Sell To</label><input className="input" value={form.sellPerson} onChange={e=>setForm({...form,sellPerson:e.target.value})} placeholder="Person name"/></div>
+            <div><label className="label">Sell To</label><PersonSelect value={form.sellPerson} onChange={v=>setForm({...form,sellPerson:v})} placeholder="Select seller"/></div>
             <div className="grid grid-cols-2 gap-2">
               <div><label className="label">Amount (AED)</label><input className="input" type="number" value={form.sellAmount} onChange={e=>setForm({...form,sellAmount:e.target.value})} placeholder="0"/></div>
               <div><label className="label">Sell Rate (₨)</label><input className="input" type="number" value={form.sellRate} onChange={e=>setForm({...form,sellRate:e.target.value})} placeholder="76.50"/></div>

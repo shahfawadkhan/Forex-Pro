@@ -4,6 +4,7 @@ import api from '../utils/api'
 import { fmtPKR, fmtAED } from '../utils/format'
 import toast from 'react-hot-toast'
 import RiyalTab from '../components/RiyalTab'
+import PersonSelect from '../components/common/PersonSelect'
 
 // ─── Tab button ────────────────────────────────────────────────────────────────
 const MainTab = ({ label, active, onClick }) => (
@@ -114,7 +115,7 @@ export default function NewTransactionPage() {
                 <h4 className="text-xs font-bold text-red-600 uppercase">↓ Buy Dirham</h4>
                 <div>
                   <label className="label">Buy From</label>
-                  <input className="input" value={dirham.buyPerson} onChange={e => setDirham({ ...dirham, buyPerson: e.target.value })} placeholder="Person name"/>
+                  <PersonSelect value={dirham.buyPerson} onChange={v => setDirham({ ...dirham, buyPerson: v })} placeholder="Select buyer"/>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
@@ -135,7 +136,7 @@ export default function NewTransactionPage() {
                 <h4 className="text-xs font-bold text-green-600 uppercase">↑ Sell Dirham</h4>
                 <div>
                   <label className="label">Sell To</label>
-                  <input className="input" value={dirham.sellPerson} onChange={e => setDirham({ ...dirham, sellPerson: e.target.value })} placeholder="Person name"/>
+                  <PersonSelect value={dirham.sellPerson} onChange={v => setDirham({ ...dirham, sellPerson: v })} placeholder="Select seller"/>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
@@ -183,11 +184,11 @@ export default function NewTransactionPage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="label">Buy From</label>
-                <input className="input" value={pkr.buyPerson} onChange={e => setPkr({ ...pkr, buyPerson: e.target.value })} placeholder="Person name"/>
+                <PersonSelect value={pkr.buyPerson} onChange={v => setPkr({ ...pkr, buyPerson: v })} placeholder="Select buyer"/>
               </div>
               <div>
                 <label className="label">Sell To</label>
-                <input className="input" value={pkr.sellPerson} onChange={e => setPkr({ ...pkr, sellPerson: e.target.value })} placeholder="Person name"/>
+                <PersonSelect value={pkr.sellPerson} onChange={v => setPkr({ ...pkr, sellPerson: v })} placeholder="Select seller"/>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -229,7 +230,7 @@ export default function NewTransactionPage() {
           <div className="p-4 space-y-4 max-w-lg">
             <div>
               <label className="label">Person Name</label>
-              <input className="input" value={adv.personName} onChange={e => setAdv({ ...adv, personName: e.target.value })} placeholder="Person name"/>
+              <PersonSelect value={adv.personName} onChange={v => setAdv({ ...adv, personName: v })} placeholder="Select person"/>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>

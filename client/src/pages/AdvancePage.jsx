@@ -7,6 +7,7 @@ import ConfirmDialog from '../components/common/ConfirmDialog'
 import StatCard from '../components/common/StatCard'
 import { fmtPKR, fmtAED, fmtDate } from '../utils/format'
 import toast from 'react-hot-toast'
+import PersonSelect from '../components/common/PersonSelect'
 import { CreditCard } from 'lucide-react'
 
 const emptyForm = { personName:'', aedAmount:'', rate:'', notes:'', date: new Date().toISOString().split('T')[0] }
@@ -83,7 +84,7 @@ export default function AdvancePage() {
 
       <Modal open={modal==='add'||modal==='edit'} onClose={()=>setModal(null)} title={modal==='edit'?'Edit Advance':'New Advance Entry'}>
         <div className="space-y-3">
-          <div><label className="label">Person Name</label><input className="input" value={form.personName} onChange={e=>setForm({...form,personName:e.target.value})} placeholder="Person name"/></div>
+          <div><label className="label">Person Name</label><PersonSelect value={form.personName} onChange={v=>setForm({...form,personName:v})} placeholder="Select person"/></div>
           <div className="grid grid-cols-2 gap-3">
             <div><label className="label">Amount (AED)</label><input className="input" type="number" value={form.aedAmount} onChange={e=>setForm({...form,aedAmount:e.target.value})} placeholder="5000"/></div>
             <div><label className="label">Rate (₨ per AED)</label><input className="input" type="number" value={form.rate} onChange={e=>setForm({...form,rate:e.target.value})} placeholder="76.50"/></div>

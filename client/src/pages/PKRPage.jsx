@@ -7,6 +7,7 @@ import Modal from '../components/common/Modal'
 import ConfirmDialog from '../components/common/ConfirmDialog'
 import { fmtPKR, fmtDate } from '../utils/format'
 import toast from 'react-hot-toast'
+import PersonSelect from '../components/common/PersonSelect'
 
 const emptyForm = { buyPerson:'', sellPerson:'', amount:'', marginPercent:'0.5', notes:'', date: new Date().toISOString().split('T')[0] }
 
@@ -76,8 +77,8 @@ export default function PKRPage() {
       <Modal open={modal==='add'||modal==='edit'} onClose={()=>setModal(null)} title={modal==='edit'?'Edit PKR Transaction':'New PKR Transaction'}>
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="label">Buy From</label><input className="input" value={form.buyPerson} onChange={e=>setForm({...form,buyPerson:e.target.value})} placeholder="Person name"/></div>
-            <div><label className="label">Sell To</label><input className="input" value={form.sellPerson} onChange={e=>setForm({...form,sellPerson:e.target.value})} placeholder="Person name"/></div>
+            <div><label className="label">Buy From</label><PersonSelect value={form.buyPerson} onChange={v=>setForm({...form,buyPerson:v})} placeholder="Select buyer"/></div>
+            <div><label className="label">Sell To</label><PersonSelect value={form.sellPerson} onChange={v=>setForm({...form,sellPerson:v})} placeholder="Select seller"/></div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div><label className="label">Amount (PKR)</label><input className="input" type="number" value={form.amount} onChange={e=>setForm({...form,amount:e.target.value})} placeholder="100000"/></div>

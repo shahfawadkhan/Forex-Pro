@@ -8,6 +8,7 @@ import { fmtPKR, fmtQAR, fmtDate } from '../utils/format'
 import { exportToPDF } from '../utils/exportPDF'
 import { downloadExcel } from '../utils/exportExcel'
 import toast from 'react-hot-toast'
+import PersonSelect from '../components/common/PersonSelect'
 
 export default function DirectPaymentPage() {
   const [records, setRecords] = useState([])
@@ -381,11 +382,10 @@ export default function DirectPaymentPage() {
         <div className="space-y-3">
           <div>
             <label className="label">Person Name</label>
-            <input
-              className="input"
+            <PersonSelect
               value={form.personName}
-              onChange={e => setForm({ ...form, personName: e.target.value })}
-              placeholder="e.g. Zaz, Fawad"
+              onChange={v => setForm({ ...form, personName: v })}
+              placeholder="Select person"
             />
             <p className="text-xs text-gray-400 mt-1">
               If person already exists, deposit will be added to their record.

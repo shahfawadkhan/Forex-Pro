@@ -8,6 +8,7 @@ import { fmtPKR, fmtQAR, fmtDate } from '../utils/format'
 import { exportToPDF } from '../utils/exportPDF'
 import { downloadExcel } from '../utils/exportExcel'
 import toast from 'react-hot-toast'
+import PersonSelect from '../components/common/PersonSelect'
 import { ArrowLeftRight } from 'lucide-react'
 
 // This page shows conversion history: who we bought from (direct payment)
@@ -193,7 +194,7 @@ export default function RiyalSaudiPage() {
             <h4 className="text-xs font-bold text-red-600 uppercase tracking-wide">↓ Buy Side (We Buy QAR)</h4>
             <div>
               <label className="label">Buy From (Person)</label>
-              <input className="input" value={form.buyPerson} onChange={e => setForm({ ...form, buyPerson: e.target.value })} placeholder="e.g. Fawad"/>
+              <PersonSelect value={form.buyPerson} onChange={v => setForm({ ...form, buyPerson: v })} placeholder="Select buyer"/>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
@@ -216,7 +217,7 @@ export default function RiyalSaudiPage() {
             <h4 className="text-xs font-bold text-green-600 uppercase tracking-wide">↑ Sell Side (We Pay)</h4>
             <div>
               <label className="label">Sell To (Person)</label>
-              <input className="input" value={form.sellPerson} onChange={e => setForm({ ...form, sellPerson: e.target.value })} placeholder="e.g. Ihsan"/>
+              <PersonSelect value={form.sellPerson} onChange={v => setForm({ ...form, sellPerson: v })} placeholder="Select seller"/>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>

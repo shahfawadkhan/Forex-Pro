@@ -23,6 +23,7 @@ app.use('/api/profit', require('./routes/profit'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/direct-payment', require('./routes/directPayment'));
+app.use('/api/persons', require('./routes/persons'));
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'OK', timestamp: new Date() }));

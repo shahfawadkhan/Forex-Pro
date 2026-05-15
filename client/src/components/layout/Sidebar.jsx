@@ -3,7 +3,7 @@ import {
   LayoutDashboard, PlusCircle, Coins, Banknote, Wallet,
   CreditCard, Building2, Home, TrendingUp, FileText,
   Settings, LogOut, ChevronLeft, ChevronRight,
-  ArrowLeftRight, Globe
+  ArrowLeftRight, Globe, Users
 } from 'lucide-react'
 import { useDispatch, useSelector } from 'react-redux'
 import { logout } from '../../store/slices/authSlice'
@@ -14,7 +14,8 @@ const nav = [
     group: 'Main',
     items: [
       { to: '/',               icon: LayoutDashboard, label: 'Dashboard' },
-      { to: '/new-transaction',icon: PlusCircle,      label: 'New Transaction' }
+      { to: '/new-transaction',icon: PlusCircle,      label: 'New Transaction' },
+      { to: '/persons',        icon: Users,           label: 'Persons' }
     ]
   },
   {

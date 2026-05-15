@@ -17,6 +17,8 @@ import VillagePage from './pages/VillagePage'
 import ProfitPage from './pages/ProfitPage'
 import ReportsPage from './pages/ReportsPage'
 import SettingsPage from './pages/SettingsPage'
+import PersonsPage from './pages/PersonsPage'
+import PersonDetailPage from './pages/PersonDetailPage'
 
 function ProtectedRoute({ children }) {
   const { token } = useSelector(s => s.auth)
@@ -49,6 +51,8 @@ export default function App() {
               <Route path="/profit"            element={<ProfitPage/>}/>
               <Route path="/reports"           element={<ReportsPage/>}/>
               <Route path="/settings"          element={<SettingsPage/>}/>
+              <Route path="/persons"           element={<PersonsPage/>}/>
+              <Route path="/persons/:id"       element={<PersonDetailPage/>}/>
               <Route path="*"                  element={<Navigate to="/" replace/>}/>
             </Routes>
           </Layout>
